@@ -1,0 +1,18 @@
+name: stx_security
+description: OIDC PKCE login, session, token refresh and scope parsing for stratastax-flutter.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+resolution: workspace
+
+dependencies:
+  crypto: ^3.0.7
+  meta: ^1.18.0
+  stx_core: ^0.0.1
+  stx_http: ^0.0.1
+  web: ^1.1.1
+dev_dependencies:
+  test: ^1.31.0

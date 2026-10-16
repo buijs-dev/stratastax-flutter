@@ -1,0 +1,27 @@
+name: match_tracker
+description: Reference app for stratastax-flutter, built on the stratastax platform contract.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  stx_annotations: ^0.0.1
+  stx_core: ^0.0.1
+  stx_http: ^0.0.1
+  stx_security: ^0.0.1
+  stx_i18n: ^0.0.1
+  stx_style: ^0.0.1
+  stx_ui: ^0.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  shelf: ^1.4.2
+  stub_server: ^0.0.1

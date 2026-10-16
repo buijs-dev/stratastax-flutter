@@ -1,0 +1,73 @@
+# Sensible defaults for every token slot, in the spirit of shadcn/ui: zinc neutrals, quiet
+# borders, a 6px radius, compact 14px UI text. An app's stx.tokens.yaml overrides any of these
+# (key by key) and adds its own tokens under `extend`.
+modes: [light, dark]
+
+primitives:
+  palette:
+    zinc:  { 50: '#FAFAFA', 100: '#F4F4F5', 200: '#E4E4E7', 300: '#D4D4D8', 400: '#A1A1AA', 500: '#71717A', 600: '#52525B', 700: '#3F3F46', 800: '#27272A', 900: '#18181B', 950: '#09090B' }
+    red:   { 400: '#F87171', 500: '#EF4444', 600: '#DC2626' }
+    green: { 400: '#4ADE80', 700: '#15803D' }
+    amber: { 300: '#FCD34D', 600: '#D97706' }
+    white: '#FFFFFF'
+  unit: 4
+  font:
+    sans: null   # platform default
+
+color:
+  primary:      { light: '{palette.zinc.900}', dark: '{palette.zinc.50}' }
+  onPrimary:    { light: '{palette.zinc.50}', dark: '{palette.zinc.900}' }
+  secondary:    { light: '{palette.zinc.100}', dark: '{palette.zinc.800}' }
+  onSecondary:  { light: '{palette.zinc.900}', dark: '{palette.zinc.50}' }
+  success:      { light: '{palette.green.700}', dark: '{palette.green.400}' }
+  onSuccess:    { light: '{palette.white}', dark: '{palette.zinc.950}' }
+  warning:      { light: '{palette.amber.600}', dark: '{palette.amber.300}' }
+  onWarning:    { light: '{palette.zinc.950}', dark: '{palette.zinc.950}' }
+  danger:       { light: '{palette.red.600}', dark: '{palette.red.400}' }
+  onDanger:     { light: '{palette.white}', dark: '{palette.zinc.950}' }
+  background:   { light: '{palette.white}', dark: '{palette.zinc.950}' }
+  onBackground: { light: '{palette.zinc.950}', dark: '{palette.zinc.50}' }
+  surface:      { light: '{palette.white}', dark: '{palette.zinc.950}' }
+  onSurface:    { light: '{palette.zinc.950}', dark: '{palette.zinc.50}' }
+  muted:        { light: '{palette.zinc.500}', dark: '{palette.zinc.400}' }
+  border:       { light: '{palette.zinc.200}', dark: '{palette.zinc.800}' }
+  focus:        { light: '{palette.zinc.400}', dark: '{palette.zinc.300}' }
+  transparent:  '#00000000'
+
+space: { none: 0, xs: 1, sm: 2, md: 4, lg: 6, xl: 8, x2l: 12, x3l: 16 }   # × unit
+radius: { none: 0, sm: 4, md: 6, lg: 8, full: 9999 }
+breakpoints: { sm: 640, md: 768, lg: 1024, xl: 1280 }
+
+text:
+  header1: { family: sans, weight: 800, lineHeight: 1.15, letterSpacing: -0.75, size: { base: 30, lg: 36 } }
+  header2: { family: sans, weight: 600, lineHeight: 1.2, letterSpacing: -0.5, size: { base: 24, lg: 30 } }
+  header3: { family: sans, weight: 600, lineHeight: 1.3, letterSpacing: -0.25, size: 18 }
+  body:    { family: sans, weight: 400, lineHeight: 1.5, size: 14 }
+  label:   { family: sans, weight: 500, lineHeight: 1.4, size: 14 }
+  caption: { family: sans, weight: 400, lineHeight: 1.4, size: 12 }
+
+components:
+  button:
+    base:      { padding: { x: md, y: sm }, radius: md, text: label, minHeight: 36 }
+    primary:   { background: primary, foreground: onPrimary }
+    secondary: { background: secondary, foreground: onSecondary }
+    danger:    { background: danger, foreground: onDanger }
+    ghost:     { background: transparent, foreground: onBackground }
+  field:
+    background: transparent
+    foreground: onSurface
+    placeholder: muted
+    border: border
+    borderFocus: focus
+    borderError: danger
+    padding: { x: md, y: sm }
+    radius: md
+    text: body
+    label: label
+    message: caption
+    gap: sm
+    borderWidth: 1
+  focus:
+    color: focus
+    width: 2
+    offset: 2

@@ -1,0 +1,768 @@
+openapi: 3.1.0
+info:
+  version: 1.0.0
+  title: Stratastax Game Catalog API
+  contact:
+    name: Contact our support
+    email: info@buijs.dev
+    url: https://buijs.dev/
+  license:
+    name: Apache-2.0
+    url: https://github.com/buijs-dev/stratastax-contract/blob/develop/LICENSE
+  description: |
+    Ingestion pipeline of the Stratastax game catalog: imports the BGG ranking, enriches every entry into a candidate (BGG data, rules found on the web, LLM interpretation with a reliability check), lets a human review the candidates and publishes approved ones to the engine, which owns the games and expansions.
+servers:
+  - url: https://stratastax.dev/rest
+security:
+  - bearerAuth: []
+tags:
+  - name: candidates
+    description: Review of games and expansions before they are published to the engine.
+  - name: pipeline
+    description: Ranking import and control of the automatic pipeline steps.
+paths:
+  /api/v1/candidates:
+    get:
+      summary: List candidates
+      description: |
+        Filterable on `stage`, `status`, `reliability`, `bggId` and `isExpansion`, e.g. `stage==INTERPRETED;status==PENDING` for the review queue.
+      operationId: listCandidates
+      security:
+        - bearerAuth:
+            - stx-game-catalog:candidate-read
+      tags:
+        - candidates
+      parameters:
+        - $ref: '#/components/parameters/query_limit'
+        - $ref: '#/components/parameters/query_cursor'
+        - $ref: '#/components/parameters/query_filter'
+        - $ref: '#/components/parameters/query_sort'
+      responses:
+        '200':
+          $ref: '#/components/responses/candidate_list'
+        '400':
+          $ref: '#/components/responses/validation_error'
+        '401':
+          $ref: '#/components/responses/unauthorized_error'
+        '403':
+          $ref: '#/components/responses/forbidden_error'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+  /api/v1/candidates/{candidateId}:
+    parameters:
+      - $ref: '#/components/parameters/path_candidate_id'
+    get:
+      summary: Get candidate
+      operationId: getCandidate
+      security:
+        - bearerAuth:
+            - stx-game-catalog:candidate-read
+      tags:
+        - candidates
+      responses:
+        '200':
+          $ref: '#/components/responses/candidate'
+        '401':
+          $ref: '#/components/responses/unauthorized_error'
+        '403':
+          $ref: '#/components/responses/forbidden_error'
+        '404':
+          $ref: '#/components/responses/not_found_error'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+  /api/v1/candidates/{candidateId}/approve:
+    parameters:
+      - $ref: '#/components/parameters/path_candidate_id'
+    post:
+      summary: Approve candidate
+      description: |
+        Approves an interpreted candidate for publication to the engine. Every field of the body overrides the candidate's own value. After the merge a game needs a description, a player range and a score type, and a win condition unless the score type is WIN_LOSS. An expansion also needs its base game: `gameId`, or else the published candidate of its BGG base game. The candidate is published asynchronously by the pipeline.
+      operationId: approveCandidate
+      security:
+        - bearerAuth:
+            - stx-game-catalog:candidate-approve
+      tags:
+        - candidates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/approve_candidate'
+      responses:
+        '200':
+          $ref: '#/components/responses/candidate'
+        '400':
+          $ref: '#/components/responses/validation_error'
+        '401':
+          $ref: '#/components/responses/unauthorized_error'
+        '403':
+          $ref: '#/components/responses/forbidden_error'
+        '404':
+          $ref: '#/components/responses/not_found_error'
+        '409':
+          $ref: '#/components/responses/conflict_error'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+  /api/v1/candidates/{candidateId}/reject:
+    parameters:
+      - $ref: '#/components/parameters/path_candidate_id'
+    post:
+      summary: Reject candidate
+      description: Rejects a candidate that is still pending review; it is never published.
+      operationId: rejectCandidate
+      security:
+        - bearerAuth:
+            - stx-game-catalog:candidate-reject
+      tags:
+        - candidates
+      responses:
+        '200':
+          $ref: '#/components/responses/candidate'
+        '401':
+          $ref: '#/components/responses/unauthorized_error'
+        '403':
+          $ref: '#/components/responses/forbidden_error'
+        '404':
+          $ref: '#/components/responses/not_found_error'
+        '409':
+          $ref: '#/components/responses/conflict_error'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+  /api/v1/pipeline/import-rankings:
+    post:
+      summary: Import the BGG ranking
+      description: |
+        Stores every row of a BGG ranking CSV export (`boardgames_ranks.csv`) as a ranking entry, all or nothing. The automatic pipeline steps pick the entries up afterwards, best ranked first.
+      operationId: importRankings
+      security:
+        - bearerAuth:
+            - stx-game-catalog:pipeline-import
+      tags:
+        - pipeline
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema:
+              type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/import_rankings_result'
+        '400':
+          $ref: '#/components/responses/validation_error'
+        '401':
+          $ref: '#/components/responses/unauthorized_error'
+        '403':
+          $ref: '#/components/responses/forbidden_error'
+        '409':
+          $ref: '#/components/responses/conflict_error'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+  /api/v1/pipeline/status:
+    get:
+      summary: Get pipeline status
+      description: |
+        The run state of every automatic step and the number of ranking entries and candidates in every stage and status.
+      operationId: getPipelineStatus
+      security:
+        - bearerAuth:
+            - stx-game-catalog:pipeline-read
+      tags:
+        - pipeline
+      responses:
+        '200':
+          $ref: '#/components/responses/pipeline_status'
+        '401':
+          $ref: '#/components/responses/unauthorized_error'
+        '403':
+          $ref: '#/components/responses/forbidden_error'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+  /api/v1/pipeline/pause:
+    post:
+      summary: Pause the pipeline
+      description: |
+        Pauses one automatic step, or all of them without `step`. A step that is running finishes the item it is working on and then stops.
+      operationId: pausePipeline
+      security:
+        - bearerAuth:
+            - stx-game-catalog:pipeline-pause
+      tags:
+        - pipeline
+      parameters:
+        - $ref: '#/components/parameters/query_pipeline_step'
+      responses:
+        '200':
+          $ref: '#/components/responses/pipeline_status'
+        '400':
+          $ref: '#/components/responses/validation_error'
+        '401':
+          $ref: '#/components/responses/unauthorized_error'
+        '403':
+          $ref: '#/components/responses/forbidden_error'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+  /api/v1/pipeline/resume:
+    post:
+      summary: Resume the pipeline
+      description: |
+        Resumes one automatic step, or all of them without `step`. Also lifts a suspension caused by an unavailable external service.
+      operationId: resumePipeline
+      security:
+        - bearerAuth:
+            - stx-game-catalog:pipeline-resume
+      tags:
+        - pipeline
+      parameters:
+        - $ref: '#/components/parameters/query_pipeline_step'
+      responses:
+        '200':
+          $ref: '#/components/responses/pipeline_status'
+        '400':
+          $ref: '#/components/responses/validation_error'
+        '401':
+          $ref: '#/components/responses/unauthorized_error'
+        '403':
+          $ref: '#/components/responses/forbidden_error'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    query_limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+    query_cursor:
+      name: cursor
+      in: query
+      required: false
+      description: |
+        Opaque cursor from a previous response's nextCursor. Omit to fetch the first page. Clients must treat this value as opaque and only pass back what was previously returned.
+      schema:
+        type: string
+    query_filter:
+      name: filter
+      in: query
+      required: false
+      description: |
+        RSQL filter expression evaluated against this resource's filterable fields. Combine multiple conditions with `;` (AND) or `,` (OR), e.g. `gameId==3fa85f64-...;playedAt=gt=2026-01-01T00:00:00Z`. The set of filterable fields is documented per endpoint in the API reference (Starlight docs); filtering on a field that isn't in that whitelist returns 400 Bad Request.
+      schema:
+        type: string
+    query_sort:
+      name: sort
+      in: query
+      required: false
+      description: |
+        Sort order. Format: `field:direction`. Direction is ASC or DESC (default ASC if omitted). 
+        Use a comma-separated list for multi-column sorting — priority follows the parameter order.
+      schema:
+        type: string
+        pattern: ^([a-zA-Z0-9_]+(:(ASC|DESC))?)(,([a-zA-Z0-9_]+(:(ASC|DESC))?))*$
+      examples:
+        singleColumn:
+          summary: Sort by a single column
+          value: playedAt:DESC
+        multiColumn:
+          summary: Sort by multiple columns
+          value: playedAt:DESC,status:ASC
+        implicitDirection:
+          summary: Omitted direction defaults to ASC
+          value: status,playedAt:DESC
+    path_candidate_id:
+      name: candidateId
+      in: path
+      required: true
+      description: Public identifier of the candidate
+      schema:
+        type: string
+        format: uuid
+    query_pipeline_step:
+      name: step
+      in: query
+      required: false
+      description: The step to act on; all steps when omitted.
+      schema:
+        $ref: '#/components/schemas/pipeline_step'
+  schemas:
+    paged_metadata:
+      type: object
+      required:
+        - limit
+      properties:
+        limit:
+          type: integer
+          format: int32
+          description: Maximum number of items returned in this page
+        prevCursor:
+          type:
+            - string
+            - 'null'
+          description: |
+            Opaque cursor to pass as the `cursor` query parameter to fetch the previous page. Null when there is no previous results. Clients must not parse or construct this value.
+        nextCursor:
+          type:
+            - string
+            - 'null'
+          description: |
+            Opaque cursor to pass as the `cursor` query parameter to fetch the next page. Null when there are no more results. Clients must not parse or construct this value.
+    score_type:
+      type: string
+      enum:
+        - SCORE
+        - TIME
+        - TURNS
+        - WIN_LOSS
+    win_condition:
+      type: string
+      enum:
+        - HIGHER_WINS
+        - LOWER_WINS
+    candidate_stage:
+      type: string
+      description: |
+        How far the automatic pipeline got: PENDING_RULES (created from BGG data), RULES_COLLECTED (rulebook sources found), INTERPRETED (ready for review), FAILED (see failureReason).
+      enum:
+        - PENDING_RULES
+        - RULES_COLLECTED
+        - INTERPRETED
+        - FAILED
+    candidate_status:
+      type: string
+      description: |
+        Review status: PENDING (awaiting review), APPROVED (queued for publication to the engine), PUBLISHED (in the engine), REJECTED.
+      enum:
+        - PENDING
+        - APPROVED
+        - PUBLISHED
+        - REJECTED
+    reliability:
+      type: string
+      description: |
+        How well the LLM's reading of the rules agrees with the BGG data: HIGH (at least three fields compared, all equal), MEDIUM (all compared fields equal, fewer than three), LOW (at least one mismatch), UNVERIFIED (nothing to compare).
+      enum:
+        - HIGH
+        - MEDIUM
+        - LOW
+        - UNVERIFIED
+    reliability_check:
+      type: object
+      description: One field compared between BGG and the LLM.
+      required:
+        - field
+        - matches
+      properties:
+        field:
+          type: string
+          description: e.g. minPlayers, maxPlayers, yearPublished, playingTime, minAge
+        bggValue:
+          type: string
+        llmValue:
+          type: string
+        matches:
+          type: boolean
+    date_time:
+      description: date-time (ISO 8601)
+      type: string
+      format: date-time
+    candidate:
+      type: object
+      required:
+        - id
+        - bggId
+        - displayName
+        - isExpansion
+        - tags
+        - stage
+        - status
+        - reliability
+        - reliabilityChecks
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        bggId:
+          type: integer
+          format: int64
+        displayName:
+          type: string
+        description:
+          type: string
+        minPlayers:
+          type: integer
+          format: int32
+        maxPlayers:
+          type: integer
+          format: int32
+        playingTime:
+          type: integer
+          format: int32
+          description: Playing time in minutes
+        minAge:
+          type: integer
+          format: int32
+        yearPublished:
+          type: integer
+          format: int32
+        imageUrl:
+          type: string
+          format: uri
+        tags:
+          type: array
+          items:
+            type: string
+        isExpansion:
+          type: boolean
+        baseGameBggId:
+          type: integer
+          format: int64
+          description: BGG id of the base game, for an expansion
+        scoreType:
+          $ref: '#/components/schemas/score_type'
+        winCondition:
+          $ref: '#/components/schemas/win_condition'
+        stage:
+          $ref: '#/components/schemas/candidate_stage'
+        status:
+          $ref: '#/components/schemas/candidate_status'
+        reliability:
+          $ref: '#/components/schemas/reliability'
+        reliabilityChecks:
+          type: array
+          items:
+            $ref: '#/components/schemas/reliability_check'
+        failureReason:
+          type: string
+          description: Why the pipeline or the last publication attempt failed
+        gameId:
+          type: string
+          format: uuid
+          description: |
+            The engine game: the published game itself, or the base game of a published or approved expansion
+        expansionId:
+          type: string
+          format: uuid
+          description: The engine expansion, once published
+        createdAt:
+          $ref: '#/components/schemas/date_time'
+        updatedAt:
+          $ref: '#/components/schemas/date_time'
+    candidate_list:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/paged_metadata'
+        - type: object
+          required:
+            - items
+          properties:
+            items:
+              type: array
+              description: Candidates in this page
+              items:
+                $ref: '#/components/schemas/candidate'
+    error_type:
+      type: string
+      description: Canonical error type identifier (URI)
+      enum:
+        - https://errors.stratastax.io/authentication
+        - https://errors.stratastax.io/authorization
+        - https://errors.stratastax.io/validation
+        - https://errors.stratastax.io/not-found
+        - https://errors.stratastax.io/conflict
+        - https://errors.stratastax.io/precondition-failed
+        - https://errors.stratastax.io/internal
+    problem_detail:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+      properties:
+        type:
+          $ref: '#/components/schemas/error_type'
+        title:
+          type: string
+          description: Short, human-readable summary
+        status:
+          type: integer
+          format: int32
+          description: HTTP status code
+        detail:
+          type: string
+          description: Human-readable explanation
+        instance:
+          type: string
+          format: uri
+          description: URI of the request that caused the error
+    validation_error:
+      type: object
+      required:
+        - field
+        - code
+        - message
+      properties:
+        field:
+          type: string
+          description: Field or property that failed validation
+        code:
+          type: string
+          description: |
+            Machine-readable validation error code, e.g. REQUIRED, VALUE_TOO_LONG, INVALID_FORMAT, OUT_OF_RANGE. Canonical list is maintained per resource in the documentation.
+        message:
+          type: string
+          description: Human readable validation message
+        rejectedValue:
+          description: The actual value that failed validation. Omitted if the value is sensitive.
+    validation_problem_detail:
+      allOf:
+        - $ref: '#/components/schemas/problem_detail'
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                $ref: '#/components/schemas/validation_error'
+    approve_candidate:
+      type: object
+      description: Overrides of the candidate's own values; every field is optional.
+      properties:
+        displayName:
+          type: string
+        description:
+          type: string
+        minPlayers:
+          type: integer
+          format: int32
+        maxPlayers:
+          type: integer
+          format: int32
+        imageUrl:
+          type: string
+          format: uri
+        tags:
+          type: array
+          items:
+            type: string
+        scoreType:
+          $ref: '#/components/schemas/score_type'
+        winCondition:
+          $ref: '#/components/schemas/win_condition'
+        gameId:
+          type: string
+          format: uuid
+          description: Engine id of the base game, for an expansion
+        existingGameId:
+          type: string
+          format: uuid
+          description: |
+            For a game candidate: the engine already has this game. The candidate is linked to it instead of publishing a new one.
+        existingExpansionId:
+          type: string
+          format: uuid
+          description: |
+            For an expansion candidate: the engine already has this expansion. The candidate is linked to it instead of publishing a new one.
+    import_rankings_result:
+      type: object
+      required:
+        - imported
+        - skipped
+      properties:
+        imported:
+          type: integer
+          format: int32
+          description: Rows stored as ranking entries
+        skipped:
+          type: integer
+          format: int32
+          description: Rows that could not be read
+    pipeline_step:
+      type: string
+      description: An automatic pipeline step.
+      enum:
+        - ENRICH_FROM_BGG
+        - COLLECT_RULES
+        - INTERPRET_RULES
+        - PUBLISH
+    pipeline_step_status:
+      type: object
+      required:
+        - step
+        - paused
+        - running
+      properties:
+        step:
+          $ref: '#/components/schemas/pipeline_step'
+        paused:
+          type: boolean
+          description: Paused through the API
+        suspendedUntil:
+          $ref: '#/components/schemas/date_time'
+        suspendReason:
+          type: string
+          description: Why an external service made the step stop for a while
+        running:
+          type: boolean
+          description: Neither paused nor suspended
+    pipeline_status:
+      type: object
+      required:
+        - steps
+        - unlinkedRankings
+        - candidatesByStage
+        - candidatesByStatus
+      properties:
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/pipeline_step_status'
+        unlinkedRankings:
+          type: integer
+          format: int64
+          description: Ranking entries still waiting for the BGG enrichment
+        candidatesByStage:
+          type: object
+          description: Number of candidates per stage
+          additionalProperties:
+            type: integer
+            format: int64
+        candidatesByStatus:
+          type: object
+          description: Number of candidates per review status
+          additionalProperties:
+            type: integer
+            format: int64
+  responses:
+    candidate_list:
+      description: List of candidates
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/candidate_list'
+    validation_error:
+      description: Request validation failed
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/validation_problem_detail'
+          examples:
+            bad_request:
+              value:
+                type: https://errors.stratastax.io/validation
+                title: Bad Request
+                status: 400
+                detail: Received invalid request data
+                errors:
+                  - field: errors
+                    code: REQUIRED
+                    message: missing required field
+            filter_field_not_allowed:
+              value:
+                type: https://errors.stratastax.io/validation
+                title: Bad Request
+                status: 400
+                detail: The filter expression references a field that is not filterable
+                errors:
+                  - field: filter
+                    code: FIELD_NOT_FILTERABLE
+                    message: '''gameName'' is not a filterable field for this resource'
+    unauthorized_error:
+      description: Authentication required or token invalid
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/problem_detail'
+          examples:
+            authentication:
+              value:
+                type: https://errors.stratastax.io/authentication
+                title: Unauthorized
+                status: 401
+                detail: Authentication required
+    forbidden_error:
+      description: Insufficient permissions
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/problem_detail'
+          examples:
+            forbidden:
+              value:
+                type: https://errors.stratastax.io/authorization
+                title: Access denied
+                status: 403
+                detail: Insufficient permissions
+    internal_server_error:
+      description: Unexpected server error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/problem_detail'
+          examples:
+            conflict:
+              value:
+                type: https://errors.stratastax.io/internal
+                title: Oops! Something went wrong.
+                status: 500
+                detail: Try again later.
+    candidate:
+      description: Candidate retrieved successfully
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/candidate'
+    not_found_error:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/problem_detail'
+          examples:
+            not_found:
+              value:
+                type: https://errors.stratastax.io/not-found
+                title: Resource not found
+                status: 404
+                detail: The requested resource could not be found
+    conflict_error:
+      description: Optimistic locking conflict, or the requested mutation is not allowed in the resource's current state
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/problem_detail'
+          examples:
+            concurrent_modification:
+              value:
+                type: https://errors.stratastax.io/conflict
+                title: Failed to update resource
+                status: 409
+                detail: The requested resource could not be updated because it has been modified by another user.
+            finalized_match:
+              value:
+                type: https://errors.stratastax.io/conflict
+                title: Match is finalized
+                status: 409
+                detail: This match is FINALIZED; propose a change via POST /matches/{matchId}/edits instead.
+    import_rankings_result:
+      description: Ranking import result
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/import_rankings_result'
+    pipeline_status:
+      description: Pipeline status
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/pipeline_status'

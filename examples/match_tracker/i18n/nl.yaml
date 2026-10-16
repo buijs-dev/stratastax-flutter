@@ -1,0 +1,32 @@
+app:
+  title: Wedstrijden
+
+matchCreateCommand:
+  title: Nieuwe wedstrijd
+  gameId: { label: Spel, hint: Zoek een spel… }
+  playedAt: { label: Gespeeld op }
+  players:
+    label: Spelers
+    add: Speler toevoegen…
+    winner: Winnaar
+    markWinner: Markeer als winnaar
+    remove: Verwijderen
+    count: "{count, plural, =0 {Nog geen spelers} one {# speler} other {# spelers}}"
+  editRequestsEnabled: { label: Anderen mogen wijzigingen voorstellen }
+
+gameCreateCommand:
+  title: Nieuw spel
+  displayName: { label: Naam }
+  description: { label: Beschrijving }
+  minPlayers: { label: Minimaal aantal spelers }
+  maxPlayers: { label: Maximaal aantal spelers }
+  scoreType: { label: Puntentelling }
+  winCondition: { label: Wie wint }
+  imageUrl: { label: Afbeelding-URL, help: Een link naar een omslagafbeelding }
+  sourceRef:
+    label: Bronverwijzing
+    help: Waar de spelgegevens vandaan komen
+
+enum:
+  ScoreTypeV1: { score: Punten, time: Tijd, turns: Beurten, winLoss: Winst / verlies }
+  WinConditionV1: { higherWins: Hoogste score wint, lowerWins: Laagste score wint }

@@ -1,0 +1,34 @@
+# Base locale (source of truth). Keys follow the convention <model>.<field>.label; the compiler
+# fails the build when a key a generated page needs is missing.
+app:
+  title: Match tracker
+
+matchCreateCommand:
+  title: New match
+  gameId: { label: Game, hint: Search a game… }
+  playedAt: { label: Played at }
+  players:
+    label: Players
+    add: Add a player…
+    winner: Winner
+    markWinner: Mark as winner
+    remove: Remove
+    count: "{count, plural, =0 {No players yet} one {# player} other {# players}}"
+  editRequestsEnabled: { label: Allow others to propose edits }
+
+gameCreateCommand:
+  title: New game
+  displayName: { label: Name }
+  description: { label: Description }
+  minPlayers: { label: Minimum players }
+  maxPlayers: { label: Maximum players }
+  scoreType: { label: Scoring }
+  winCondition: { label: Who wins }
+  imageUrl: { label: Image URL, help: A link to a cover image }
+  sourceRef:
+    label: Source reference
+    help: Where the game data comes from
+
+enum:
+  ScoreTypeV1: { score: Points, time: Time, turns: Turns, winLoss: Win / loss }
+  WinConditionV1: { higherWins: Highest score wins, lowerWins: Lowest score wins }

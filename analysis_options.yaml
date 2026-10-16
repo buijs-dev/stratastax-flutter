@@ -1,0 +1,18 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  exclude:
+    - "docs/examples/**"
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+# The stx rules for apps: no material/cupertino, no raw colors or insets, no string literals as UI
+# text, no hand-made token ids. Generated code and the stx_* packages are exempt.
+plugins:
+  stx_lints:
+    path: packages/stx_lints
+
+formatter:
+  page_width: 120

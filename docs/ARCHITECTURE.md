@@ -2,9 +2,7 @@
 
 The reference implementation is [`examples/match_tracker`](../examples/match_tracker): real
 contracts, tokens, translations, login and two forms, with an end-to-end test against the stub
-server (`test/e2e_test.dart`) and a demo (`tool/demo.sh`, see the README of the example). The files
-in [`docs/examples`](examples) are illustrative design sketches; where they differ, the example app
-is current.
+server (`test/e2e_test.dart`) and a demo (`tool/demo.sh`, see the README of the example).
 
 ## Contents
 

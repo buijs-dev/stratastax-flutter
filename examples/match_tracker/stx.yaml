@@ -1,0 +1,40 @@
+# Compiler configuration (docs/ARCHITECTURE.md §3).
+# The specs are the bundled artifacts of stratastax-contract (build/openapi/*.yaml), copied here.
+# Each backend gets its own typed client (AppServices.platform, AppServices.catalog); the base URL
+# can be overridden with --dart-define=STX_PLATFORM_BASE_URL=… / STX_CATALOG_BASE_URL=….
+backends:
+  platform:
+    baseUrl: http://localhost:9000      # examples/stub_server
+    auth: oidc
+  catalog:
+    baseUrl: http://localhost:8081
+    auth: oidc
+
+contracts:
+  platformV1:
+    spec: openapi/platform-v1.yaml
+    modelSuffix: V1
+    apiSuffix: ApiV1
+    backend: platform
+  catalogV1:
+    spec: openapi/catalog-v1.yaml
+    modelSuffix: V1
+    apiSuffix: ApiV1
+    backend: catalog
+
+tokens: stx.tokens.yaml
+
+i18n:
+  dir: i18n
+  base: en
+  locales: [en, nl]
+
+security:
+  oidc:
+    issuer: http://localhost:9000/realms/stratastax   # the stub; --dart-define=STX_OIDC_ISSUER for Keycloak
+    clientId: match-tracker
+  social:
+    google: Google
+    github: GitHub
+
+output: lib/gen

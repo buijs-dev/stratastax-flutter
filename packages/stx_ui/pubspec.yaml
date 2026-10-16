@@ -1,0 +1,24 @@
+name: stx_ui
+description: Unstyled-by-default widgets driven by design tokens. Depends on flutter/widgets only.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  stx_core: ^0.0.1
+  stx_style: ^0.0.1
+  stx_i18n: ^0.0.1
+  meta: ^1.18.0
+  stx_http: ^0.0.1
+  stx_security: ^0.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

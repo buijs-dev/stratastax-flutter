@@ -1,0 +1,55 @@
+stx:
+  action:
+    save: Opslaan
+    cancel: Annuleren
+    back: Terug
+    retry: Opnieuw proberen
+  state:
+    loading: Laden…
+    empty: Hier staat nog niets
+  access:
+    forbidden: Je hebt geen toegang tot deze pagina
+    signIn: Inloggen
+  route:
+    notFound: Pagina niet gevonden
+  validation:
+    required: Verplicht
+    minLength: "Minimaal {min, plural, one {# teken} other {# tekens}}"
+    maxLength: "Maximaal {max, plural, one {# teken} other {# tekens}}"
+    minItems: "Kies minimaal {min, plural, one {# item} other {# items}}"
+    maxItems: "Kies maximaal {max, plural, one {# item} other {# items}}"
+    minimum: "Minimaal {min, number}"
+    maximum: "Maximaal {max, number}"
+    pattern: Ongeldig formaat
+    format: Ongeldige waarde
+    server: Afgewezen ({code})
+  problem:
+    generic: Er ging iets mis
+    network: Geen verbinding
+    validation: Verbeter de gemarkeerde velden
+    authorization: Je mag dit niet doen
+    notFound: Niet gevonden
+    conflict: Dit botst met bestaande gegevens
+  field:
+    search: Typ om te zoeken
+    noResults: Geen resultaten
+    dateTimeHint: JJJJ-MM-DD UU:MM
+    dateHint: JJJJ-MM-DD
+    now: Nu
+    choose: Kies…
+  saved:
+    message: Opgeslagen
+  validationCodes:
+    outOfRange: Waarde valt buiten het toegestane bereik
+    notFound: Bestaat niet
+    tooLong: Waarde is te lang
+  calendar:
+    open: Kalender
+    previousMonth: Vorige maand
+    nextMonth: Volgende maand
+  session:
+    title: Log in om verder te gaan
+    signInWith: Inloggen met {provider}
+    signOut: Uitloggen
+    failed: Inloggen is niet gelukt; probeer het opnieuw
+    cancelled: Inloggen is afgebroken

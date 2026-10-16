@@ -1,0 +1,49 @@
+import 'msg.dart';
+
+/// Framework message keys (namespace `stx`), one per key in `lib/i18n/stx.en.yaml`. The compiler
+/// puts their texts in every app's message tables; an app can override one by translating the key.
+abstract final class StxKeys {
+  static const actionSave = MsgKey('stx.action.save');
+  static const actionCancel = MsgKey('stx.action.cancel');
+  static const actionBack = MsgKey('stx.action.back');
+  static const actionRetry = MsgKey('stx.action.retry');
+  static const stateLoading = MsgKey('stx.state.loading');
+  static const stateEmpty = MsgKey('stx.state.empty');
+  static const accessForbidden = MsgKey('stx.access.forbidden');
+  static const accessSignIn = MsgKey('stx.access.signIn');
+  static const routeNotFound = MsgKey('stx.route.notFound');
+  static const validationRequired = MsgKey('stx.validation.required');
+  static Msg validationMinLength(int min) => MsgArgs(const MsgKey('stx.validation.minLength'), [min]);
+  static Msg validationMaxLength(int max) => MsgArgs(const MsgKey('stx.validation.maxLength'), [max]);
+  static Msg validationMinItems(int min) => MsgArgs(const MsgKey('stx.validation.minItems'), [min]);
+  static Msg validationMaxItems(int max) => MsgArgs(const MsgKey('stx.validation.maxItems'), [max]);
+  static Msg validationMinimum(num min) => MsgArgs(const MsgKey('stx.validation.minimum'), [min]);
+  static Msg validationMaximum(num max) => MsgArgs(const MsgKey('stx.validation.maximum'), [max]);
+  static const validationPattern = MsgKey('stx.validation.pattern');
+  static const validationFormat = MsgKey('stx.validation.format');
+  static Msg validationServer(String code) => MsgArgs(const MsgKey('stx.validation.server'), [code]);
+  static const problemGeneric = MsgKey('stx.problem.generic');
+  static const problemNetwork = MsgKey('stx.problem.network');
+  static const problemValidation = MsgKey('stx.problem.validation');
+  static const problemAuthorization = MsgKey('stx.problem.authorization');
+  static const problemNotFound = MsgKey('stx.problem.notFound');
+  static const problemConflict = MsgKey('stx.problem.conflict');
+  static const fieldSearch = MsgKey('stx.field.search');
+  static const fieldNoResults = MsgKey('stx.field.noResults');
+  static const fieldDateTimeHint = MsgKey('stx.field.dateTimeHint');
+  static const fieldDateHint = MsgKey('stx.field.dateHint');
+  static const fieldNow = MsgKey('stx.field.now');
+  static const fieldChoose = MsgKey('stx.field.choose');
+  static const savedMessage = MsgKey('stx.saved.message');
+  static const validationCodesOutOfRange = MsgKey('stx.validationCodes.outOfRange');
+  static const validationCodesNotFound = MsgKey('stx.validationCodes.notFound');
+  static const validationCodesTooLong = MsgKey('stx.validationCodes.tooLong');
+  static const calendarOpen = MsgKey('stx.calendar.open');
+  static const calendarPreviousMonth = MsgKey('stx.calendar.previousMonth');
+  static const calendarNextMonth = MsgKey('stx.calendar.nextMonth');
+  static const sessionTitle = MsgKey('stx.session.title');
+  static Msg sessionSignInWith(String provider) => MsgArgs(const MsgKey('stx.session.signInWith'), [provider]);
+  static const sessionSignOut = MsgKey('stx.session.signOut');
+  static const sessionFailed = MsgKey('stx.session.failed');
+  static const sessionCancelled = MsgKey('stx.session.cancelled');
+}

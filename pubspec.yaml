@@ -1,0 +1,21 @@
+name: stratastax_flutter_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+workspace:
+  - packages/stx_annotations
+  - packages/stx_core
+  - packages/stx_http
+  - packages/stx_security
+  - packages/stx_style
+  - packages/stx_i18n
+  - packages/stx_ui
+  - packages/stx_compiler
+  - packages/stx_lints
+  - examples/match_tracker
+  - examples/stub_server
+
+dev_dependencies:
+  lints: ^6.0.0

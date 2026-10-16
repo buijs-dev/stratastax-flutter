@@ -1,0 +1,8 @@
+# Only the contract: the stub uses the generated models, codecs and validation server-side.
+contracts:
+  platformV1:
+    spec: ../match_tracker/openapi/platform-v1.yaml
+    modelSuffix: V1
+    apiSuffix: ApiV1
+
+output: lib/gen

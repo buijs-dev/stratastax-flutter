@@ -1,0 +1,16 @@
+name: stx_lints
+description: Analyzer rules that keep stratastax-flutter apps token-only and string-free.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+resolution: workspace
+dependencies:
+  analysis_server_plugin: ^0.3.14
+  analyzer: ^12.1.0
+dev_dependencies:
+  analyzer_testing: ^0.2.5
+  test: ^1.31.0
+  test_reflective_loader: ^0.6.0

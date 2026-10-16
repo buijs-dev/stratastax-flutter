@@ -1,0 +1,19 @@
+name: stub_server
+description: Contract-conformant stub of the stratastax platform API, built on the code stx_compiler generates.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+resolution: workspace
+
+dependencies:
+  args: ^2.7.0
+  crypto: ^3.0.7
+  shelf: ^1.4.2
+  shelf_router: ^1.1.4
+  stx_core: ^0.0.1
+
+dev_dependencies:
+  test: ^1.31.0

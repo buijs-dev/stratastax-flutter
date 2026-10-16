@@ -1,0 +1,13 @@
+name: stx_annotations
+description: Const annotation classes for stratastax-flutter (pure Dart). Mirrors stratastax-entity annotations.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+resolution: workspace
+dependencies:
+  meta: ^1.18.0
+dev_dependencies:
+  test: ^1.31.0

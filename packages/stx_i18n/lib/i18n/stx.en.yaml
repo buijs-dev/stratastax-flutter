@@ -1,0 +1,58 @@
+# Framework texts of stratastax-flutter (namespace `stx`). The order is the MsgKey id: never
+# reorder or remove an entry, only append (StxKeys in lib/src/keys.dart mirrors it; a test checks).
+# Apps override any value in their own i18n/<locale>.yaml under `stx:`.
+stx:
+  action:
+    save: Save
+    cancel: Cancel
+    back: Back
+    retry: Try again
+  state:
+    loading: Loading…
+    empty: Nothing here yet
+  access:
+    forbidden: You don't have access to this page
+    signIn: Sign in
+  route:
+    notFound: Page not found
+  validation:
+    required: Required
+    minLength: "At least {min, plural, one {# character} other {# characters}}"
+    maxLength: "At most {max, plural, one {# character} other {# characters}}"
+    minItems: "Choose at least {min, plural, one {# item} other {# items}}"
+    maxItems: "Choose at most {max, plural, one {# item} other {# items}}"
+    minimum: "Must be at least {min, number}"
+    maximum: "Must be at most {max, number}"
+    pattern: Invalid format
+    format: Invalid value
+    server: Rejected ({code})
+  problem:
+    generic: Something went wrong
+    network: No connection
+    validation: Please correct the highlighted fields
+    authorization: You are not allowed to do this
+    notFound: Not found
+    conflict: This conflicts with existing data
+  field:
+    search: Type to search
+    noResults: No results
+    dateTimeHint: YYYY-MM-DD HH:MM
+    dateHint: YYYY-MM-DD
+    now: Now
+    choose: Choose…
+  saved:
+    message: Saved
+  validationCodes:
+    outOfRange: Value is out of range
+    notFound: Does not exist
+    tooLong: Value is too long
+  calendar:
+    open: Calendar
+    previousMonth: Previous month
+    nextMonth: Next month
+  session:
+    title: Sign in to continue
+    signInWith: Sign in with {provider}
+    signOut: Sign out
+    failed: Signing in did not work; please try again
+    cancelled: Signing in was cancelled

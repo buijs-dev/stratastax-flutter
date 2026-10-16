@@ -1,0 +1,16 @@
+name: stx_http
+description: HTTP client with interceptor chain and typed endpoints (pure Dart, io/web transports).
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+resolution: workspace
+
+dependencies:
+  meta: ^1.18.0
+  stx_core: ^0.0.1
+  web: ^1.1.1
+dev_dependencies:
+  test: ^1.31.0

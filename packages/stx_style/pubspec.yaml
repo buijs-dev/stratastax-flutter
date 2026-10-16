@@ -1,0 +1,17 @@
+name: stx_style
+description: Design-token schema and theme runtime. Depends on flutter/widgets only.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
