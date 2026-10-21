@@ -19,8 +19,9 @@ abstract final class StyleCodes {
   static const contrast = 'STX-S003';
 }
 
-/// Parses the framework defaults and the app's `stx.tokens.yaml` into a [StyleIR]. The app
-/// overrides the defaults key by key; references (`{palette.blue.700}`) are resolved after merging.
+/// Parses the framework defaults, an optional brand layer (`tokens.base`) and the app's
+/// `stx.tokens.yaml` into a [StyleIR]. Each layer overrides the one below key by key; references
+/// (`{palette.blue.700}`) are resolved after merging.
 final class StyleFrontend {
   StyleFrontend(this.diagnostics);
 
@@ -28,12 +29,14 @@ final class StyleFrontend {
   late Map<String, Object?> _root;
   late String _source;
 
-  StyleIR? parseFiles({required String defaults, String? app, String? displayApp}) {
-    final base = _load(defaults, 'stx_style defaults');
-    if (base == null) return null;
+  StyleIR? parseFiles({required String defaults, String? base, String? displayBase, String? app, String? displayApp}) {
+    final framework = _load(defaults, 'stx_style defaults');
+    if (framework == null) return null;
+    final brand = base == null ? const <String, Object?>{} : _load(base, displayBase ?? base);
+    if (brand == null) return null;
     final overrides = app == null ? const <String, Object?>{} : _load(app, displayApp ?? app);
     if (overrides == null) return null;
-    return parse(base, overrides, source: displayApp ?? 'stx_style defaults');
+    return parse(_merge(framework, brand), overrides, source: displayApp ?? displayBase ?? 'stx_style defaults');
   }
 
   StyleIR parseSource(String defaults, String app, {String source = 'stx.tokens.yaml'}) =>
@@ -181,6 +184,15 @@ final class StyleFrontend {
       if (focusNode['offset'] != null) 'offset': _number(focusNode['offset'], 'components.focus.offset') ?? 2,
     };
 
+    final specs = <String, Map<String, Object>>{
+      for (final e in componentKinds.entries)
+        e.key: {
+          for (final p in e.value.entries)
+            if (_map(components[e.key])[p.key] case final value?)
+              p.key: ?_component(value, p.value, 'components.${e.key}.${p.key}', colors.keys),
+        },
+    };
+
     final ir = StyleIR(
       modes: activeModes,
       colors: colors,
@@ -193,6 +205,7 @@ final class StyleFrontend {
       buttonExtensions: [...buttonExtensions.keys],
       field: field,
       focus: focus,
+      components: specs,
       source: source,
     );
     _checkContrast(ir);
@@ -269,6 +282,14 @@ final class StyleFrontend {
     return null;
   }
 
+  Object? _component(Object value, String kind, String path, Iterable<String> colors) => switch (kind) {
+    'color' => _token(value, colors, path, 'color'),
+    'space' => _token(value, spaceTokens, path, 'space'),
+    'radius' => _token(value, radiusTokens, path, 'radius'),
+    'text' => _token(value, textTokens, path, 'text'),
+    _ => _number(value, path),
+  };
+
   double? _number(Object? value, String path) {
     if (value is num) return value.toDouble();
     _error(StyleCodes.missing, path, 'expected a number, got "$value"');
@@ -294,6 +315,15 @@ final class StyleFrontend {
         check('components.button.${e.key}', e.value.foreground, e.value.background);
       }
       check('components.field', '${ir.field['foreground'] ?? 'onSurface'}', '${ir.field['background'] ?? 'surface'}');
+      final table = ir.components['table'] ?? const {};
+      check('components.table', '${table['foreground'] ?? 'onBackground'}', '${table['background'] ?? 'transparent'}');
+      final chip = ir.components['chip'] ?? const {};
+      check('components.chip', '${chip['foreground'] ?? 'onSurface'}', '${chip['background'] ?? 'surface'}');
+      check(
+        'components.chip.selected',
+        '${chip['selectedForeground'] ?? 'onPrimary'}',
+        '${chip['selectedBackground'] ?? 'primary'}',
+      );
       check('color.onBackground', 'onBackground', 'background');
       check('color.onSurface', 'onSurface', 'surface');
     }

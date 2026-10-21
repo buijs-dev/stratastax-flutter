@@ -1,0 +1,16 @@
+name: stx_search
+description: Cursor-paged search against stratastax list endpoints (RSQL filters, sort, cache). Pure Dart.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+resolution: workspace
+
+dependencies:
+  meta: ^1.18.0
+  stx_core: ^0.0.1
+  stx_http: ^0.0.1
+dev_dependencies:
+  test: ^1.31.0

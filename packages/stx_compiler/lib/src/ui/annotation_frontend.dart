@@ -25,6 +25,10 @@ abstract final class UiCodes {
 
   /// An annotation could not be evaluated (unresolved reference) or is used wrongly.
   static const annotation = 'STX-U009';
+
+  /// An overview (`@UiListPage`) does not fit its list or count operation, or a search
+  /// annotation does not fit its field.
+  static const list = 'STX-U010';
 }
 
 /// Reads the annotated classes of the app (`lib/`, except the generated output) with the analyzer,
@@ -38,6 +42,7 @@ final class AnnotationFrontend {
   final Diagnostics diagnostics;
 
   final _forms = <FormIR>[];
+  final _lists = <ListPageIR>[];
   final _entities = <String, EntityIR>{};
   final _dataSources = <String, DataSourceIR>{};
   final _fieldWidgets = <String, FieldWidgetIR>{};
@@ -56,12 +61,14 @@ final class AnnotationFrontend {
       if (result is ResolvedLibraryResult) _library(result.element);
     }
     _forms.sort((a, b) => a.name.compareTo(b.name));
+    _lists.sort((a, b) => a.name.compareTo(b.name));
     return UiIR(
       package: _packageName(),
       forms: _forms,
       entities: _entities,
       dataSources: _dataSources,
       fieldWidgets: _fieldWidgets,
+      lists: _lists,
     );
   }
 
@@ -77,6 +84,8 @@ final class AnnotationFrontend {
       if (annotations.isEmpty) continue;
       if (annotations['UiForm'] case final form?) {
         _form(element as ClassElement, form, annotations);
+      } else if (annotations['UiListPage'] case final list?) {
+        _list(element as ClassElement, list, annotations);
       } else if (annotations.containsKey('DomainEntity') && element is ClassElement) {
         _entities[element.name!] = EntityIR(
           name: element.name!,
@@ -99,7 +108,10 @@ final class AnnotationFrontend {
       final library = type?.element?.library?.uri.toString() ?? '';
       if (value == null) {
         final source = annotation.toSource();
-        if (source.startsWith('@Ui') || source.startsWith('@Domain') || source.startsWith('@Build')) {
+        if (source.startsWith('@Ui') ||
+            source.startsWith('@Domain') ||
+            source.startsWith('@Build') ||
+            source.startsWith('@Search')) {
           diagnostics.error(
             UiCodes.annotation,
             'cannot evaluate $source: ${(annotation.constantEvaluationErrors ?? const []).map((e) => e.message).join('; ')}',
@@ -132,8 +144,49 @@ final class AnnotationFrontend {
             : RouteIR(
                 path: route.getField('path')?.toStringValue() ?? '/',
                 nav: _enumName(route.getField('nav')) ?? 'none',
+                home: route.getField('home')?.toBoolValue() ?? false,
               ),
         requires: [for (final scope in requires) ?scope.getField('claim')?.toStringValue()],
+      ),
+    );
+  }
+
+  void _list(ClassElement element, DartObject list, Map<String, DartObject> annotations) {
+    final endpoint = _endpoint(list.getField('list'), element, 'UiListPage.list');
+    if (endpoint == null) return;
+    final countValue = list.getField('count');
+    final count = countValue == null || countValue.isNull ? null : _endpoint(countValue, element, 'UiListPage.count');
+    final route = annotations['UiRoute'];
+    final requires = annotations['UiRequires']?.getField('scopes')?.toListValue() ?? const [];
+    final panel = list.getField('panel');
+    final cache = list.getField('cache');
+    final hasCache = cache != null && !cache.isNull;
+    _lists.add(
+      ListPageIR(
+        name: element.name!,
+        library: element.library.uri.toString(),
+        location: _location(element),
+        list: endpoint,
+        count: count,
+        fields: _fields(element),
+        pageSize: list.getField('pageSize')?.toIntValue(),
+        layout: _enumName(panel?.getField('layout')) ?? 'auto',
+        position: _enumName(panel?.getField('position')) ?? 'start',
+        collapseBelow: _enumName(panel?.getField('collapseBelow')) ?? 'md',
+        cacheMode: hasCache ? _enumName(cache.getField('mode')) ?? 'memory' : null,
+        cacheTtl: hasCache ? cache.getField('ttlSeconds')?.toIntValue() : null,
+        route: route == null
+            ? null
+            : RouteIR(
+                path: route.getField('path')?.toStringValue() ?? '/',
+                nav: _enumName(route.getField('nav')) ?? 'none',
+                home: route.getField('home')?.toBoolValue() ?? false,
+              ),
+        requires: [for (final scope in requires) ?scope.getField('claim')?.toStringValue()],
+        actions: [
+          for (final action in list.getField('actions')?.toListValue() ?? const <DartObject>[])
+            ?action.getField('page')?.toTypeValue()?.element?.name,
+        ],
       ),
     );
   }
@@ -176,6 +229,30 @@ final class AnnotationFrontend {
         pattern: validate?.getField('pattern')?.toStringValue(),
       ),
       hasDefault: param?.hasDefaultValue ?? false,
+      column: switch (a['UiColumn']) {
+        final c? => ColumnIR(
+          order: c.getField('order')?.toIntValue(),
+          primary: c.getField('primary')?.toBoolValue() ?? false,
+          flex: c.getField('flex')?.toIntValue() ?? 1,
+        ),
+        null => null,
+      },
+      filter: switch (a['SearchFilter']) {
+        final f? => FilterIR(
+          alias: f.getField('alias')?.toStringValue() ?? '',
+          source: f.getField('source')?.toTypeValue()?.element?.name,
+        ),
+        null => null,
+      },
+      sort: switch (a['SearchSort']) {
+        final s? => SortIR(
+          alias: s.getField('alias')?.toStringValue() ?? '',
+          direction: _enumName(s.getField('direction')) ?? 'asc',
+          initial: s.getField('initial')?.toBoolValue() ?? false,
+        ),
+        null => null,
+      },
+      searchText: a['SearchText']?.getField('alias')?.toStringValue(),
     );
   }
 

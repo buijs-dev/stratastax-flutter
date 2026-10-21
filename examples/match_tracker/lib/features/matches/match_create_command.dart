@@ -8,7 +8,7 @@ import 'participants_field.dart';
 /// Recording a match (`POST /api/v1/matches`). Everything else is generated: the form state,
 /// straight-line validation from the contract, the mapping to `CreateMatchV1`, the page, the route,
 /// the navigation entry and the scope check.
-@UiRoute('/matches/new', nav: UiNav.primary)
+@UiRoute('/matches/new')
 @UiForm(submit: MatchesApiV1.createMatch)
 @UiRequires([Scope.ghostPlayerRead]) // ParticipantsField searches ghost players
 @DomainEntity()

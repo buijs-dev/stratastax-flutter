@@ -56,3 +56,27 @@ stx:
     signOut: Sign out
     failed: Signing in did not work; please try again
     cancelled: Signing in was cancelled
+  search:
+    label: Search
+    hint: Search…
+    filters: Filters
+    filtersActive: "Filters ({count, number})"
+    showResults: Show results
+    reset: Clear filters
+    sortBy: Sort by
+    ascending: Ascending
+    descending: Descending
+    from: From
+    to: To
+    any: Any
+    yes: Yes
+    no: No
+    remove: Remove filter
+  pager:
+    previous: Previous
+    next: Next
+    range: "{from, number}–{to, number} of {total, number}"
+    page: "Page {page, number}"
+  theme:
+    light: Light mode
+    dark: Dark mode

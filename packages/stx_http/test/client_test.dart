@@ -87,6 +87,28 @@ void main() {
       expect(result.valueOrNull?.status, 200);
     });
 
+    test('exchangeIfModified: 304 is Ok(null), anything else as exchange', () async {
+      transport
+        ..enqueue(StxResponse(status: 304, headers: {'ETag': '"7"'}))
+        ..enqueue(json(200, '{"id":"${matchId.value}"}', headers: {'ETag': '"8"'}));
+      Future<Result<StxReply<MatchV1>?, Problem>> get() => client.exchangeIfModified(
+        MatchesApiV1.getMatch,
+        params: const GetMatchParams(matchId: matchId),
+        body: (),
+      );
+      expect(await get(), isA<Ok<StxReply<MatchV1>?, Problem>>().having((r) => r.value, 'value', isNull));
+      expect((await get()).valueOrNull?.header('etag'), '"8"');
+
+      // Without the conditional call a 304 is not a success.
+      transport.enqueue(StxResponse(status: 304));
+      final plain = await client.exchange(
+        MatchesApiV1.getMatch,
+        params: const GetMatchParams(matchId: matchId),
+        body: (),
+      );
+      expect(plain.valueOrNull, isNull);
+    });
+
     test('error responses become the contract problem', () async {
       transport.enqueue(
         json(

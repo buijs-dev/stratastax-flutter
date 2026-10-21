@@ -1,0 +1,11 @@
+name: stx_icu
+description: The ICU MessageFormat subset of stratastax-flutter - parser, AST and argument types (pure Dart).
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+resolution: workspace
+dev_dependencies:
+  test: ^1.31.0

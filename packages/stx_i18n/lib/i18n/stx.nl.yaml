@@ -53,3 +53,27 @@ stx:
     signOut: Uitloggen
     failed: Inloggen is niet gelukt; probeer het opnieuw
     cancelled: Inloggen is afgebroken
+  search:
+    label: Zoeken
+    hint: Zoeken…
+    filters: Filters
+    filtersActive: "Filters ({count, number})"
+    showResults: Toon resultaten
+    reset: Filters wissen
+    sortBy: Sorteren op
+    ascending: Oplopend
+    descending: Aflopend
+    from: Van
+    to: Tot en met
+    any: Alle
+    yes: Ja
+    no: Nee
+    remove: Filter verwijderen
+  pager:
+    previous: Vorige
+    next: Volgende
+    range: "{from, number}–{to, number} van {total, number}"
+    page: "Pagina {page, number}"
+  theme:
+    light: Lichte modus
+    dark: Donkere modus

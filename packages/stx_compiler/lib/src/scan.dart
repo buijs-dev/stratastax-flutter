@@ -15,7 +15,7 @@ Map<String, Object?> scanReport(BuildResult result, StxConfig config, {bool cont
         b.name: {
           'baseUrl': b.baseUrl,
           'env': b.envName,
-          'auth': b.oidc ? 'oidc' : 'none',
+          'auth': b.auth.name,
           'contracts': [
             for (final c in config.contracts)
               if (c.backend == b.name) c.name,

@@ -479,6 +479,13 @@ final class ContractFrontend {
       location: _at(pointer),
       summary: node['summary'] as String?,
       description: node['description'] as String?,
+      search: switch (node['x-stx-search']) {
+        final Map<String, Object?> search => SearchIR(
+          filter: [for (final f in search['filter'] as List? ?? const []) f.toString()],
+          sort: [for (final f in search['sort'] as List? ?? const []) f.toString()],
+        ),
+        _ => null,
+      },
     );
   }
 

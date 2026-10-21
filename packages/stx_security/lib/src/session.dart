@@ -9,6 +9,7 @@ import 'package:stx_http/stx_http.dart';
 import 'jwt.dart';
 import 'oidc.dart';
 import 'platform/platform.dart';
+import 'token_endpoint.dart';
 
 /// Who is signed in, from the ID token (or the access token).
 @immutable
@@ -156,7 +157,7 @@ final class Session implements TokenSource {
     if (pending == null || pending['state'] != query['state']) return _fail(LoginFailure.stateMismatch);
 
     final result = await _client.send(
-      _tokenEndpoint,
+      tokenEndpoint,
       params: config.tokenPath.split('/'),
       body: {
         'grant_type': 'authorization_code',
@@ -237,7 +238,7 @@ final class Session implements TokenSource {
     final refresh = _store.read(_refreshKey);
     if (refresh == null) return null;
     final result = await _client.send(
-      _tokenEndpoint,
+      tokenEndpoint,
       params: config.tokenPath.split('/'),
       body: {'grant_type': 'refresh_token', 'refresh_token': refresh, 'client_id': config.clientId},
     );
@@ -269,40 +270,4 @@ final class Session implements TokenSource {
           ),
     );
   }
-
-  static const _tokenEndpoint = Endpoint<List<String>, Map<String, String>, TokenResponse>(
-    operationId: 'oidcToken',
-    method: HttpMethod.post,
-    path: PathTemplate(['{tokenPath}']),
-    security: Secured.public(),
-    requestContentType: 'application/x-www-form-urlencoded',
-    encodePath: _segments,
-    encodeBody: _form,
-    decode: TokenResponse.decode,
-  );
-
-  static List<String> _segments(List<String> path) => path;
-
-  static Object? _form(Map<String, String> body) => Uri(queryParameters: body).query;
-}
-
-/// The token endpoint's answer (RFC 6749 §5.1).
-@immutable
-final class TokenResponse {
-  const TokenResponse({required this.accessToken, this.refreshToken, this.idToken, this.expiresIn});
-
-  static TokenResponse decode(Object? json) {
-    final j = Json.object(json);
-    return TokenResponse(
-      accessToken: Json.string(j, 'access_token'),
-      refreshToken: Json.stringOrNull(j, 'refresh_token'),
-      idToken: Json.stringOrNull(j, 'id_token'),
-      expiresIn: Json.integerOrNull(j, 'expires_in'),
-    );
-  }
-
-  final String accessToken;
-  final String? refreshToken;
-  final String? idToken;
-  final int? expiresIn;
 }

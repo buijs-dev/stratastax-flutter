@@ -16,6 +16,9 @@ final class StxTokens {
     required this.buttons,
     this.field = const FieldSpec(),
     this.focus = const FocusSpec(),
+    this.table = const TableSpec(),
+    this.chip = const ChipSpec(),
+    this.panel = const PanelSpec(),
   });
 
   /// By [ColorToken] id; gaps between the fixed slots and extensions are unused.
@@ -37,6 +40,9 @@ final class StxTokens {
   final List<ButtonSpec> buttons;
   final FieldSpec field;
   final FocusSpec focus;
+  final TableSpec table;
+  final ChipSpec chip;
+  final PanelSpec panel;
 
   Color color(ColorToken token) => colors[token.id];
 

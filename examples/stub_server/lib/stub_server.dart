@@ -1,19 +1,23 @@
-/// A contract-conformant stub of the stratastax platform API for examples/match_tracker.
+/// A contract-conformant stub of the stratastax platform API (and the consumer part of the i18n
+/// API) for examples/match_tracker.
 ///
 /// Requests are decoded and responses encoded with the code stx_compiler generates from the
 /// contract, and bodies are validated with the same `*Validation` constants the app uses, so the
 /// stub cannot drift from the contract unnoticed.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:stx_core/stx_core.dart';
 
+import 'gen/contract/i18n_v1/i18n_v1.g.dart' as i18n;
 import 'gen/contract/platform_v1/platform_v1.g.dart';
 import 'gen/contract/scopes.g.dart';
 import 'src/oidc.dart';
+import 'src/search.dart';
 import 'src/store.dart';
 
 export 'src/oidc.dart';
@@ -34,6 +38,7 @@ final class _Routes {
     oidc.bind(router);
     router
       ..get('/api/v1/games/suggestions', _secured(GamesApiV1.getGameSuggestions, _gameSuggestions))
+      ..get('/api/v1/games/count', _secured(GamesApiV1.countGames, _countGames))
       ..get('/api/v1/games', _secured(GamesApiV1.listGames, _listGames))
       ..post('/api/v1/games', _secured(GamesApiV1.createGame, _idempotent(_createGame)))
       ..get('/api/v1/games/<id>', _secured(GamesApiV1.getGame, _getGame))
@@ -41,9 +46,11 @@ final class _Routes {
         '/api/v1/ghost-players/suggestions',
         _secured(GhostPlayersApiV1.getGhostPlayerSuggestions, _ghostPlayerSuggestions),
       )
+      ..get('/api/v1/matches/count', _secured(MatchesApiV1.countMatches, _countMatches))
       ..get('/api/v1/matches', _secured(MatchesApiV1.listMatches, _listMatches))
       ..post('/api/v1/matches', _secured(MatchesApiV1.createMatch, _idempotent(_createMatch)))
       ..get('/api/v1/matches/<id>', _secured(MatchesApiV1.getMatch, _getMatch))
+      ..get('/api/v1/applications/<app>/bundles/<locale>', _secured(i18n.BundlesApiV1.getBundle, _getBundle))
       ..all(
         '/<ignored|.*>',
         (Request r) => _problem(404, ErrorTypeV1.notFound, 'No stub for ${r.method} /${r.url.path}'),
@@ -56,16 +63,39 @@ final class _Routes {
 
   /// What the backend does (Quarkus `@RolesAllowed`): no or invalid token → 401, a token without
   /// one of the operation's scopes → 403. The rule comes from the generated endpoint.
-  Function _secured(Endpoint<Object?, Object?, Object?> endpoint, Function handler) => (Request request) {
+  /// A [Handler], so shelf_router passes the path parameters in `request.params`.
+  Handler _secured(Endpoint<Object?, Object?, Object?> endpoint, Function handler) => (Request request) async {
     final claims = oidc.verify(request.headers['authorization']);
     final granted = claims == null ? const <Scope>{} : Scope.fromClaims(jwtRoleClaims(claims));
     if (endpoint.security.allows(authenticated: claims != null, granted: granted)) {
-      return Function.apply(handler, [request, ...request.params.values]);
+      return await (Function.apply(handler, [request, ...request.params.values]) as FutureOr<Response>);
     }
     return claims == null
         ? _problem(401, ErrorTypeV1.authentication, 'A valid bearer token is required')
         : _problem(403, ErrorTypeV1.authorization, '${endpoint.operationId} requires ${endpoint.security}');
   };
+
+  // -- translations (i18n contract) -----------------------------------------------------------
+
+  /// The published bundle, with the release as ETag: `If-None-Match` with the current one → 304.
+  Response _getBundle(Request request, String app, String locale) {
+    final messages = app == 'match-tracker' ? store.bundles[locale] : null;
+    if (messages == null) return _problem(404, ErrorTypeV1.notFound, 'Nothing published for $app/$locale');
+    final etag = '"${store.bundleRelease}"';
+    if (request.headers['if-none-match'] == etag) return Response(304, headers: {'ETag': etag});
+    final bundle = i18n.TranslationBundleV1(
+      application: app,
+      locale: locale,
+      version: store.bundleRelease,
+      publishedAt: DateTime.utc(2026, 10, 1, 12),
+      messages: messages,
+    );
+    return Response(
+      200,
+      body: jsonEncode(i18n.TranslationBundleV1.encode(bundle)),
+      headers: {..._jsonHeaders, 'ETag': etag},
+    );
+  }
 
   // -- games ----------------------------------------------------------------------------------
 
@@ -78,10 +108,35 @@ final class _Routes {
     ]);
   }
 
-  Response _listGames(Request request) => _json(
-    200,
-    GameListV1.encode(GameListV1(limit: _limit(request), items: store.games.take(_limit(request)).toList())),
+  /// The filterable and sortable fields of `listGames` (its description in the contract).
+  static final _games = StubSearch<GameV1>(
+    filters: {
+      'id': (g) => g.id.value,
+      'name': (g) => g.displayName,
+      'description': (g) => g.description,
+      'minPlayers': (g) => g.minPlayers,
+      'maxPlayers': (g) => g.maxPlayers,
+      'tags': (g) => g.tags,
+      'scoreType': (g) => g.scoreType.wire,
+      'winCondition': (g) => g.winCondition?.wire,
+      'sourceRef': (g) => g.sourceRef,
+      'createdAt': (g) => g.createdAt,
+      'updatedAt': (g) => g.updatedAt,
+    },
+    sorts: {
+      'id': (g) => g.id.value,
+      'name': (g) => g.displayName,
+      'createdAt': (g) => g.createdAt,
+      'updatedAt': (g) => g.updatedAt,
+    },
+    id: (g) => g.id.value,
   );
+
+  Response _listGames(Request request) => _page(request, _games, store.games, (items, next, prev, limit) {
+    return GameListV1.encode(GameListV1(limit: limit, items: items, nextCursor: next, prevCursor: prev));
+  });
+
+  Response _countGames(Request request) => _count(request, _games, store.games);
 
   Response _getGame(Request request, String id) {
     final game = store.games.where((g) => g.id.value == id).firstOrNull;
@@ -137,12 +192,34 @@ final class _Routes {
 
   // -- matches --------------------------------------------------------------------------------
 
-  Response _listMatches(Request request) => _json(
-    200,
-    MatchListV1.encode(
-      MatchListV1(limit: _limit(request), items: store.matches.reversed.take(_limit(request)).toList()),
-    ),
+  /// The filterable and sortable fields of `listMatches` (its description in the contract).
+  static final _matches = StubSearch<MatchV1>(
+    filters: {
+      'id': (m) => m.id.value,
+      'gameId': (m) => m.game.id.value,
+      'gameName': (m) => m.game.displayName,
+      'recorderId': (m) => m.recorder.id.value,
+      'recorderName': (m) => m.recorder.displayName,
+      'playedAt': (m) => m.playedAt,
+      'finalizedAt': (m) => m.finalizedAt,
+      'editRequestsEnabled': (m) => m.editRequestsEnabled,
+      'lastEditedAt': (m) => m.lastEditedAt,
+      'createdAt': (m) => m.createdAt,
+    },
+    sorts: {
+      'id': (m) => m.id.value,
+      'playedAt': (m) => m.playedAt,
+      'editRequestsEnabled': (m) => m.editRequestsEnabled,
+      'createdAt': (m) => m.createdAt,
+    },
+    id: (m) => m.id.value,
   );
+
+  Response _listMatches(Request request) => _page(request, _matches, store.matches, (items, next, prev, limit) {
+    return MatchListV1.encode(MatchListV1(limit: limit, items: items, nextCursor: next, prevCursor: prev));
+  });
+
+  Response _countMatches(Request request) => _count(request, _matches, store.matches);
 
   Response _getMatch(Request request, String id) {
     final match = store.matches.where((m) => m.id.value == id).firstOrNull;
@@ -234,6 +311,31 @@ final class _Routes {
 
   static int _limit(Request request) => int.tryParse(request.url.queryParameters['limit'] ?? '') ?? 20;
 
+  /// A page of [all]; `limit` is the number of items returned, as in the engine.
+  static Response _page<T>(
+    Request request,
+    StubSearch<T> search,
+    List<T> all,
+    Object? Function(List<T> items, String? next, String? prev, int limit) encode,
+  ) {
+    final q = request.url.queryParameters;
+    try {
+      final page = search.page(all, limit: _limit(request), cursor: q['cursor'], filter: q['filter'], sort: q['sort']);
+      return _json(200, encode(page.items, page.next, page.prev, page.items.length));
+    } on SearchException catch (e) {
+      return _violation('query', 'INVALID_SEARCH', e.message);
+    }
+  }
+
+  static Response _count<T>(Request request, StubSearch<T> search, List<T> all) {
+    try {
+      final count = search.filter(all, request.url.queryParameters['filter']).length;
+      return _json(200, CountV1.encode(CountV1(count: count)));
+    } on SearchException catch (e) {
+      return _violation('query', 'INVALID_SEARCH', e.message);
+    }
+  }
+
   static Iterable<T> _matching<T>(List<T> items, String query, String Function(T) name) =>
       items.where((i) => name(i).toLowerCase().contains(query.toLowerCase())).take(10);
 }
@@ -276,7 +378,7 @@ Middleware _cors() =>
       const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Accept, Authorization, Content-Type, Idempotency-Key, If-Match',
+        'Access-Control-Allow-Headers': 'Accept, Authorization, Content-Type, Idempotency-Key, If-Match, If-None-Match',
         'Access-Control-Expose-Headers': 'ETag, Idempotent-Replayed',
       };
       if (request.method == 'OPTIONS') return Response(204, headers: headers);

@@ -300,6 +300,16 @@ final class ScopedSecurity extends SecurityIR {
 
 enum HttpMethodIR { get, head, post, put, patch, delete }
 
+/// `x-stx-search` of a list or count operation: the fields the server filters and sorts on. When
+/// present the compiler checks `@SearchFilter` / `@SearchSort` against it; without it the
+/// whitelist lives only in the operation's description.
+final class SearchIR {
+  const SearchIR({this.filter = const [], this.sort = const []});
+
+  final List<String> filter;
+  final List<String> sort;
+}
+
 final class OperationIR {
   const OperationIR({
     required this.operationId,
@@ -315,6 +325,7 @@ final class OperationIR {
     this.idempotent = false,
     this.summary,
     this.description,
+    this.search,
   });
 
   final String operationId;
@@ -340,6 +351,9 @@ final class OperationIR {
   final String location;
   final String? summary;
   final String? description;
+
+  /// From `x-stx-search`; null when the operation has none.
+  final SearchIR? search;
 
   List<String> get segments => path.split('/').where((s) => s.isNotEmpty).toList();
 

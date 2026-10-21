@@ -14,4 +14,5 @@ pids+=($!)
 pids+=($!)
 
 cd "$root/examples/match_tracker"
-flutter run -d chrome --web-port 8085 --dart-define=STX_PLATFORM_BASE_URL=http://localhost:9000
+flutter run -d chrome --web-port 8085 --dart-define=STX_PLATFORM_BASE_URL=http://localhost:9000 \
+  --dart-define=STX_I18N_CLIENT_SECRET=stub-secret  # the stub's i18n service account

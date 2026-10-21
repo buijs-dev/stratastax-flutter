@@ -4,3 +4,8 @@ pubspec_overrides.yaml
 .idea/
 *.iml
 .DS_Store
+/examples/match_tracker/stx.lock
+/examples/match_tracker/lib/gen/
+/examples/stub_server/lib/gen/
+# Local source overrides of the stx compiler (point a source at a checkout); never committed.
+stx.local.yaml

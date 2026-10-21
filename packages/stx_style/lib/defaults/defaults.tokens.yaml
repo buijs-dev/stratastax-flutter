@@ -67,6 +67,35 @@ components:
     message: caption
     gap: sm
     borderWidth: 1
+  table:
+    headerBackground: surface
+    headerForeground: muted
+    background: transparent
+    backgroundAlt: surface
+    foreground: onBackground
+    divider: border
+    padX: md
+    padY: sm
+    header: label
+    text: body
+  chip:
+    background: surface
+    foreground: onSurface
+    selectedBackground: primary
+    selectedForeground: onPrimary
+    border: border
+    padX: sm
+    padY: xs
+    radius: full
+    text: caption
+  panel:
+    background: surface
+    foreground: onSurface
+    border: border
+    padding: md
+    gap: md
+    radius: md
+    width: 280
   focus:
     color: focus
     width: 2

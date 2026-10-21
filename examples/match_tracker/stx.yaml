@@ -1,7 +1,13 @@
 # Compiler configuration (docs/ARCHITECTURE.md §3).
-# The specs are the bundled artifacts of stratastax-contract (build/openapi/*.yaml), copied here.
+# The specs are the bundled artifacts of stratastax-contract and the brand tokens those of
+# stratastax-design, both published on docs.stratastax.dev. stx.lock pins their sha256;
+# `stx sources update` fetches new versions. To build against local checkouts, put
+# `sources: { stratastax: ../../../stratastax-docs/public }` in stx.local.yaml (not committed).
 # Each backend gets its own typed client (AppServices.platform, AppServices.catalog); the base URL
 # can be overridden with --dart-define=STX_PLATFORM_BASE_URL=… / STX_CATALOG_BASE_URL=….
+sources:
+  stratastax: https://docs.stratastax.dev/
+
 backends:
   platform:
     baseUrl: http://localhost:9000      # examples/stub_server
@@ -9,25 +15,41 @@ backends:
   catalog:
     baseUrl: http://localhost:8081
     auth: oidc
+  # The i18n CMS: published translations, fetched with the app's own service account (not the
+  # user's session). The secret comes from --dart-define=STX_I18N_CLIENT_SECRET=… (stub: stub-secret).
+  i18n:
+    baseUrl: http://localhost:9000      # examples/stub_server
+    auth: serviceAccount
+    serviceAccount:
+      clientId: match-tracker-i18n
+      scopes: [stx-i18n:bundle-read]
 
 contracts:
   platformV1:
-    spec: openapi/platform-v1.yaml
+    spec: stratastax:openapi/stratastax.platform.api-v1.yaml
     modelSuffix: V1
     apiSuffix: ApiV1
     backend: platform
   catalogV1:
-    spec: openapi/catalog-v1.yaml
+    spec: stratastax:openapi/stratastax.catalog.api-v1.yaml
     modelSuffix: V1
     apiSuffix: ApiV1
     backend: catalog
 
-tokens: stx.tokens.yaml
+# stx_style defaults ← the Stratastax brand layer ← the app's own tokens.
+tokens:
+  base: stratastax:design/stratastax.tokens.yaml
+  file: stx.tokens.yaml
 
 i18n:
   dir: i18n
   base: en
   locales: [en, nl]
+  # Published translations from the i18n backend overlay these files (only existing keys).
+  remote:
+    backend: i18n
+    application: match-tracker
+    spec: stratastax:openapi/stratastax.i18n.api-v1.yaml
 
 security:
   oidc:

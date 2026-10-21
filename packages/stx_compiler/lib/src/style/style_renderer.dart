@@ -60,6 +60,10 @@ GeneratedFile renderStyle(StyleIR ir) {
       ..writeln('  ],')
       ..writeln('  field: ${_spec('FieldSpec', ir.field, _fieldKinds, ir)},')
       ..writeln('  focus: ${_spec('FocusSpec', ir.focus, _focusKinds, ir)},')
+      ..writeAll([
+        for (final e in componentKinds.entries)
+          '  ${e.key}: ${_spec(componentSpecType(e.key), ir.components[e.key] ?? const {}, e.value, ir)},\n',
+      ])
       ..writeln(');')
       ..writeln();
   }

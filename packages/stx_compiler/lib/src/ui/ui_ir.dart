@@ -139,6 +139,10 @@ final class FieldIR {
     this.ignore = false,
     this.validate = const UiValidateIR(),
     this.hasDefault = false,
+    this.column,
+    this.filter,
+    this.sort,
+    this.searchText,
   });
 
   final String name;
@@ -165,12 +169,94 @@ final class FieldIR {
 
   /// The constructor parameter has a default value.
   final bool hasDefault;
+
+  /// Overviews (`@UiListPage`): `@UiColumn`, `@SearchFilter`, `@SearchSort`, `@SearchText`.
+  final ColumnIR? column;
+  final FilterIR? filter;
+  final SortIR? sort;
+
+  /// `@SearchText(alias: …)`: the alias, empty for the default.
+  final String? searchText;
+}
+
+final class ColumnIR {
+  const ColumnIR({this.order, this.primary = false, this.flex = 1});
+
+  final int? order;
+  final bool primary;
+  final int flex;
+}
+
+final class FilterIR {
+  const FilterIR({this.alias = '', this.source});
+
+  /// Empty: the flattened path.
+  final String alias;
+
+  /// Class name of a `@UiDataSource` class.
+  final String? source;
+}
+
+final class SortIR {
+  const SortIR({this.alias = '', this.direction = 'asc', this.initial = false});
+
+  final String alias;
+
+  /// `asc` or `desc`.
+  final String direction;
+  final bool initial;
+}
+
+/// `@UiListPage` on a `@DomainEntity` class: an overview of a list operation.
+final class ListPageIR {
+  const ListPageIR({
+    required this.name,
+    required this.library,
+    required this.location,
+    required this.list,
+    required this.fields,
+    this.count,
+    this.pageSize,
+    this.layout = 'auto',
+    this.position = 'start',
+    this.collapseBelow = 'md',
+    this.cacheMode,
+    this.cacheTtl,
+    this.route,
+    this.requires = const [],
+    this.actions = const [],
+  });
+
+  final String name;
+  final String library;
+  final String location;
+  final EndpointRef list;
+  final EndpointRef? count;
+  final List<FieldIR> fields;
+  final int? pageSize;
+
+  /// `UiPanelLayout`, `UiPanelPosition` and `UiBreakpoint` value names.
+  final String layout;
+  final String position;
+  final String collapseBelow;
+
+  /// `UiCacheMode` name and seconds; null: stx.yaml `search.cache`.
+  final String? cacheMode;
+  final int? cacheTtl;
+  final RouteIR? route;
+  final List<String> requires;
+
+  /// `UiAction` pages (class names), in order.
+  final List<String> actions;
 }
 
 final class RouteIR {
-  const RouteIR({required this.path, required this.nav});
+  const RouteIR({required this.path, required this.nav, this.home = false});
 
   final String path;
+
+  /// `@UiRoute(home: true)`.
+  final bool home;
 
   /// `primary`, `secondary` or `none`.
   final String nav;
@@ -250,6 +336,7 @@ final class UiIR {
     required this.entities,
     required this.dataSources,
     required this.fieldWidgets,
+    this.lists = const [],
   });
 
   /// The app's package name (for `package:` imports of generated code).
@@ -258,4 +345,5 @@ final class UiIR {
   final Map<String, EntityIR> entities;
   final Map<String, DataSourceIR> dataSources;
   final Map<String, FieldWidgetIR> fieldWidgets;
+  final List<ListPageIR> lists;
 }

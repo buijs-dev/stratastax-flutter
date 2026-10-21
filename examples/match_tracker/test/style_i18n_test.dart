@@ -22,13 +22,14 @@ void main() {
     await tester.pump();
     final text = tester.widget<Text>(find.text('Match tracker'));
     expect(text.style!.color, const Color(0xFFFFFFFF)); // onWin
-    expect(stxTokensLight.color(AppColor.win), const Color(0xFF15803D));
+    expect(stxTokensLight.color(AppColor.win), const Color(0xFF0F766E)); // success of the brand layer
   });
 
   test('dark mode resolves references per mode', () {
-    expect(stxTokensLight.color(ColorToken.primary), const Color(0xFF7C3AED)); // violet.600
-    expect(stxTokensDark.color(ColorToken.primary), const Color(0xFF7C3AED)); // violet.600, both modes
-    expect(stxTokensLight.color(ColorToken.border), const Color(0xFFE4E4E7)); // zinc.200 (default)
+    // From the brand layer (stratastax-design).
+    expect(stxTokensLight.color(ColorToken.primary), const Color(0xFF4F46E5)); // indigo.600
+    expect(stxTokensDark.color(ColorToken.primary), const Color(0xFF818CF8)); // indigo.400
+    expect(stxTokensLight.color(ColorToken.border), const Color(0xFFE0E3F2)); // ink.200
   });
 
   test('framework texts and app texts share one table; non-base locales load deferred', () async {

@@ -172,7 +172,7 @@ final class I18nFrontend {
         final own = entry.value;
         final same =
             own.length == arguments.length &&
-            own.keys.every((k) => arguments.containsKey(k) && _compatible(arguments[k]!, own[k]!));
+            own.keys.every((k) => arguments.containsKey(k) && arguments[k]!.compatibleWith(own[k]!));
         if (!same) {
           diagnostics.error(
             I18nCodes.placeholders,
@@ -200,8 +200,6 @@ final class I18nFrontend {
   }
 
   // A locale may use a placeholder plainly where the base formats it (or the reverse).
-  static bool _compatible(ArgType a, ArgType b) => a == b || a == ArgType.any || b == ArgType.any;
-
   static String _describe(Map<String, ArgType> args) =>
       '{${args.entries.map((e) => e.value == ArgType.any ? e.key : '${e.key}: ${e.value.name}').join(', ')}}';
 

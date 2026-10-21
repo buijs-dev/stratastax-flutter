@@ -8,10 +8,12 @@ import 'package:stx_compiler/stx_compiler.dart';
 Future<void> main(List<String> args) async {
   final runner = CommandRunner<int>('stx', 'stratastax-flutter compiler.')
     ..argParser.addOption('project', abbr: 'p', help: 'Directory with stx.yaml.', defaultsTo: '.')
+    ..argParser.addFlag('offline', help: 'Only use the cached remote sources (specs, tokens) of stx.lock.')
     ..addCommand(_Build())
     ..addCommand(_Watch())
     ..addCommand(_Scan())
-    ..addCommand(_I18n());
+    ..addCommand(_I18n())
+    ..addCommand(_Sources());
   try {
     exitCode = await runner.run(args) ?? 0;
   } on UsageException catch (e) {
@@ -21,6 +23,9 @@ Future<void> main(List<String> args) async {
 }
 
 String _project(Command<int> command) => Directory(command.globalResults!['project'] as String).absolute.path;
+
+StxPipeline _pipeline(Command<int> command) =>
+    StxPipeline(_project(command), offline: command.globalResults!['offline'] as bool);
 
 /// Prints diagnostics; returns the exit code.
 int _report(Diagnostics diagnostics) {
@@ -40,7 +45,7 @@ final class _Build extends Command<int> {
 
   @override
   Future<int> run() async {
-    final result = await StxPipeline(_project(this)).run();
+    final result = await _pipeline(this).run();
     final code = _report(result.diagnostics);
     if (result.write case final write?) {
       stdout.writeln(
@@ -68,7 +73,7 @@ final class _Scan extends Command<int> {
   @override
   Future<int> run() async {
     final project = _project(this);
-    final result = await StxPipeline(project).run(write: false);
+    final result = await _pipeline(this).run(write: false);
     final code = _report(result.diagnostics);
     final config = StxConfig.load(project, Diagnostics());
     if (config != null) {
@@ -90,7 +95,7 @@ final class _Sync extends Command<int> {
   @override
   Future<int> run() async {
     final project = _project(this);
-    final first = await StxPipeline(project).run();
+    final first = await _pipeline(this).run();
     if (first.missingKeys.isEmpty) {
       final code = _report(first.diagnostics);
       stdout.writeln('stx i18n sync: all keys present');
@@ -105,7 +110,7 @@ final class _Sync extends Command<int> {
         stdout.writeln('  $key: ${first.missingKeys[key]}');
       }
     }
-    final second = await StxPipeline(project).run();
+    final second = await _pipeline(this).run();
     return _report(second.diagnostics);
   }
 }
@@ -135,7 +140,7 @@ final class _Watch extends Command<int> {
     await watchProject(config, (changed) async {
       final clock = Stopwatch()..start();
       if (changed.isNotEmpty) stdout.writeln('\nchanged: ${changed.join(', ')}');
-      final result = await StxPipeline(project).run();
+      final result = await _pipeline(this).run();
       _report(result.diagnostics);
       final write = result.write;
       stdout.writeln(
@@ -159,4 +164,48 @@ final class _I18n extends Command<int> {
 
   @override
   String get description => 'Manage translation files.';
+}
+
+final class _Sources extends Command<int> {
+  _Sources() {
+    addSubcommand(_SourcesUpdate());
+  }
+
+  @override
+  String get name => 'sources';
+
+  @override
+  String get description => 'Manage the remote sources of stx.yaml (specs, tokens) and stx.lock.';
+}
+
+final class _SourcesUpdate extends Command<int> {
+  @override
+  String get name => 'update';
+
+  @override
+  String get description => 'Fetch the latest version of every remote source, show what changed and update stx.lock.';
+
+  @override
+  Future<int> run() async {
+    final project = _project(this);
+    final diagnostics = Diagnostics();
+    final config = StxConfig.load(project, diagnostics);
+    if (config == null || diagnostics.hasErrors) return _report(diagnostics);
+    final changes = await RemoteSources(project, config.sources).update(diagnostics);
+    for (final change in changes) {
+      stdout.writeln('${change.source.display}: ${change.before == null ? 'locked' : 'updated'}');
+      for (final line in change.summary) {
+        stdout.writeln('  $line');
+      }
+    }
+    final code = _report(diagnostics);
+    if (code == 0) {
+      stdout.writeln(
+        changes.isEmpty
+            ? 'stx sources update: everything up to date'
+            : 'stx sources update: ${SourceLock.fileName} updated; run stx build',
+      );
+    }
+    return code;
+  }
 }

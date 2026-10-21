@@ -1,7 +1,15 @@
 # Only the contract: the stub uses the generated models, codecs and validation server-side.
+# The same spec as examples/match_tracker, pinned in this project's stx.lock.
+sources:
+  stratastax: https://docs.stratastax.dev/
+
 contracts:
   platformV1:
-    spec: ../match_tracker/openapi/platform-v1.yaml
+    spec: stratastax:openapi/stratastax.platform.api-v1.yaml
+    modelSuffix: V1
+    apiSuffix: ApiV1
+  i18nV1:
+    spec: stratastax:openapi/stratastax.i18n.api-v1.yaml
     modelSuffix: V1
     apiSuffix: ApiV1
 

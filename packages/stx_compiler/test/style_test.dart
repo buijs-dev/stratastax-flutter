@@ -36,6 +36,37 @@ color:
     expect(parsed.ir.colors['danger']!['light'], 0xFFDC2626);
   });
 
+  test('a brand layer (tokens.base) sits between the defaults and the app', () {
+    final dir = Directory.systemTemp.createTempSync('stx_style');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    File(p.join(dir.path, 'defaults.yaml')).writeAsStringSync(_defaults);
+    File(p.join(dir.path, 'brand.yaml')).writeAsStringSync('''
+color:
+  primary: '#4F46E5'
+  success: '#0F766E'
+''');
+    File(p.join(dir.path, 'app.yaml')).writeAsStringSync("color:\n  success: '#15803D'\n");
+    final diagnostics = Diagnostics();
+    final ir = StyleFrontend(diagnostics).parseFiles(
+      defaults: p.join(dir.path, 'defaults.yaml'),
+      base: p.join(dir.path, 'brand.yaml'),
+      displayBase: 'stratastax:design/stratastax.tokens.yaml',
+      app: p.join(dir.path, 'app.yaml'),
+    )!;
+    expect(diagnostics.hasErrors, isFalse);
+    expect(ir.colors['primary']!['light'], 0xFF4F46E5); // brand
+    expect(ir.colors['success']!['light'], 0xFF15803D); // the app wins
+    expect(ir.colors['danger']!['light'], 0xFFDC2626); // defaults
+
+    final missing = Diagnostics();
+    StyleFrontend(missing).parseFiles(
+      defaults: p.join(dir.path, 'defaults.yaml'),
+      base: p.join(dir.path, 'none.yaml'),
+      displayBase: 'stratastax:design/stratastax.tokens.yaml',
+    );
+    expect(missing.all.single.location, 'stratastax:design/stratastax.tokens.yaml');
+  });
+
   test('hex forms: #RGB, #RRGGBB, #RRGGBBAA (alpha last, CSS order)', () {
     final parsed = _parse('''
 color:

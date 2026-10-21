@@ -1,6 +1,7 @@
 # stub_server
 
-A contract-conformant stub of the stratastax platform API for `examples/match_tracker`.
+A contract-conformant stub of the stratastax platform API, and of the consumer part of the i18n
+API (published translations), for `examples/match_tracker`.
 
 It is built on the code `stx_compiler` generates from the same contract (`lib/gen/contract`, from
 `stx.yaml`): requests are decoded and responses encoded with the generated models, and bodies are
@@ -16,7 +17,8 @@ Then run the app against it:
 
 ```sh
 cd ../match_tracker
-flutter run -d chrome --dart-define=STX_PLATFORM_BASE_URL=http://localhost:9000
+flutter run -d chrome --dart-define=STX_PLATFORM_BASE_URL=http://localhost:9000 \
+  --dart-define=STX_I18N_CLIENT_SECRET=stub-secret
 ```
 
 | Endpoint                                          | Behaviour                                                                                  |
@@ -27,16 +29,18 @@ flutter run -d chrome --dart-define=STX_PLATFORM_BASE_URL=http://localhost:9000
 | `GET /api/v1/ghost-players/suggestions?query=`    | Seeded ghost players (Alice, Bob, Charlie, Charlotte, Diana, Eve)                          |
 | `GET /api/v1/matches`, `GET /api/v1/matches/{id}` | Recorded matches                                                                           |
 | `POST /api/v1/matches`                            | Validates participants, game and ghost players; `Idempotency-Key` replays                  |
+| `GET /api/v1/applications/match-tracker/bundles/{locale}` | The published translations (i18n contract): `nl` overrides `app.title` and an ICU plural; `en` has none (404). `ETag` is the release; `If-None-Match` with it gives 304 |
 | anything else                                     | `404` problem document naming the missing route                                            |
 
 Errors are RFC 9457 problem documents (`problem_detail.yaml` / `validation_problem_detail.yaml`).
-No authentication yet: that arrives with the Keycloak stub endpoints in M4.
 
 ## Login
 
 OIDC endpoints like Keycloak's under `/realms/stratastax/protocol/openid-connect/` (`auth`, `token`,
-`logout`): Authorization Code with PKCE (S256 only), refresh-token rotation. The login page offers
-three users; `kc_idp_hint=google` signs in as `player`, `github` as `admin`.
+`logout`): Authorization Code with PKCE (S256 only), refresh-token rotation, and client credentials
+for the service account `match-tracker-i18n` (secret `stub-secret`, role `stx-i18n:bundle-read`),
+with which the app reads the translations. The login page offers three users;
+`kc_idp_hint=google` signs in as `player`, `github` as `admin`.
 
 | User | Scopes |
 |---|---|

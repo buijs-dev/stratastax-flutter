@@ -47,10 +47,13 @@ final class UiForm {
 /// the i18n key `<model>.title`.
 @Target({TargetKind.classType})
 final class UiRoute {
-  const UiRoute(this.path, {this.nav = UiNav.none});
+  const UiRoute(this.path, {this.nav = UiNav.none, this.home = false});
 
   final String path;
   final UiNav nav;
+
+  /// The page the app opens on; default: `/`, else the first primary route by path.
+  final bool home;
 }
 
 /// Binds a path parameter to a field with a different name.

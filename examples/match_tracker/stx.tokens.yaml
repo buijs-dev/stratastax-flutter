@@ -1,33 +1,18 @@
-# Design tokens of match_tracker: the shadcn-style defaults of stx_style (zinc neutrals, 6px
-# radius, compact type) with vivid accents: violet for primary actions, blue for focus and
-# accents, green for success and winners. Everything not set here comes from
-# packages/stx_style/lib/defaults/defaults.tokens.yaml.
-modes: [light, dark]
-
+# Design tokens of match_tracker: only what is specific to the app. Everything else comes from the
+# Stratastax brand layer (tokens.base in stx.yaml: stratastax-design) on top of the stx_style
+# defaults (packages/stx_style/lib/defaults/defaults.tokens.yaml).
 primitives:
   palette:
-    violet: { 400: '#A78BFA', 500: '#8B5CF6', 600: '#7C3AED' }
-    blue:   { 400: '#60A5FA', 500: '#3B82F6', 600: '#2563EB' }
-    green:  { 400: '#4ADE80', 500: '#22C55E', 600: '#16A34A', 700: '#15803D' }
     orange: { 400: '#FB923C', 700: '#C2410C' }
 
 color:
-  # Saturated accents in both modes, with white text (all pass WCAG AA, also on zinc-950).
-  primary:     '{palette.violet.600}'
-  onPrimary:   '{palette.white}'
-  success:     '{palette.green.700}'
-  onSuccess:   '{palette.white}'
-  focus:       { light: '{palette.blue.500}', dark: '{palette.blue.400}' }
   extend:
-    accent:   '{palette.blue.600}'
-    onAccent: '{palette.white}'
-    win:      '{palette.green.700}'
-    onWin:    '{palette.white}'
-    loss:     { light: '{palette.orange.700}', dark: '{palette.orange.400}' }
+    # A winner is a success; a loss is quiet orange, never the danger red.
+    win:   '{color.success}'
+    onWin: '{color.onSuccess}'
+    loss:  { light: '{palette.orange.700}', dark: '{palette.orange.400}' }
 
 components:
   button:
     extend:
-      win:     { background: win, foreground: onWin }
-      accent:  { background: accent, foreground: onAccent }
-      outline: { background: transparent, foreground: onBackground, border: border }
+      win: { background: win, foreground: onWin }

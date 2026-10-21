@@ -5,7 +5,8 @@ import 'package:stx_compiler/stx_compiler.dart';
 import 'package:test/test.dart';
 
 /// Runs the pipeline over examples/match_tracker, which uses the real bundled contracts of
-/// stratastax-contract (platform and catalog).
+/// stratastax-contract (platform and catalog), pinned in its stx.lock. They are read from the cache
+/// in its .dart_tool; a fresh checkout fetches them from docs.stratastax.dev once.
 void main() {
   final project = p.normalize(p.join(Directory.current.path, '..', '..', 'examples', 'match_tracker'));
   late BuildResult result;
@@ -19,7 +20,7 @@ void main() {
   test('every operation of both contracts is generated', () {
     final platform = result.contracts.firstWhere((c) => c.name == 'platformV1');
     final catalog = result.contracts.firstWhere((c) => c.name == 'catalogV1');
-    expect(platform.operations, hasLength(69));
+    expect(platform.operations, hasLength(76)); // incl. countGames, countPlaysets, countCommunities, countGroups
     expect(catalog.operations, hasLength(8));
     expect(platform.operations.every((o) => o.security is ScopedSecurity), isTrue);
   });

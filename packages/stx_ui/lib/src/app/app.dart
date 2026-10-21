@@ -35,18 +35,30 @@ class StxApp extends StatelessWidget {
     required this.router,
     required this.access,
     this.mode = StxThemeMode.system,
+    this.themeStore,
     this.localeStore,
     this.initialLocale,
+    this.translations,
+    this.translationCache,
+    this.onTranslationIssue,
     this.title = '',
   });
 
   final StxTokens light;
   final StxTokens dark;
   final StxThemeMode mode;
+
+  /// Remembers the mode the user picks with the toggle in [StxAppShell].
+  final ThemeModeStore? themeStore;
   final List<Locale> locales;
   final MessagesLoader messages;
   final LocaleStore? localeStore;
   final Locale? initialLocale;
+
+  /// Translations from a backend laid over the compiled ones (see [StxLocaleScope]).
+  final TranslationSource? translations;
+  final TranslationCache? translationCache;
+  final void Function(TranslationIssue issue)? onTranslationIssue;
   final RouterConfig<Object> router;
   final StxAccess access;
 
@@ -59,6 +71,9 @@ class StxApp extends StatelessWidget {
     load: messages,
     store: localeStore,
     initial: initialLocale,
+    translations: translations,
+    cache: translationCache,
+    onIssue: onTranslationIssue,
     child: Builder(
       builder: (context) => WidgetsApp.router(
         routerConfig: router,
@@ -71,6 +86,7 @@ class StxApp extends StatelessWidget {
           light: light,
           dark: dark,
           mode: mode,
+          store: themeStore,
           child: StxAccessScope(
             access: access,
             child: Builder(
@@ -103,18 +119,26 @@ class StxAppShell<R extends Object> extends StatelessWidget {
       for (final item in items)
         if (access.authenticated && item.requires.satisfiedBy(access.scopes)) item,
     ];
-    final current = navigator.current;
     final wide = context.breakpoint.index >= Breakpoint.md.index;
     final buttons = [
       for (final item in visible)
         StxButton(
           item.title,
           alignment: wide ? AlignmentDirectional.centerStart : Alignment.center,
-          variant: item.route == current ? ButtonVariant.secondary : ButtonVariant.ghost,
+          variant: navigator.isActive(item.route) ? ButtonVariant.secondary : ButtonVariant.ghost,
           onPressed: () => navigator.go(item.route),
         ),
     ];
     if (visible.isEmpty) return child;
+    final dark = StxTheme.isDarkOf(context);
+    // A symbol: the bottom bar has no room for the full label, which stays for screen readers.
+    final themeToggle = StxButton(
+      Msg.data(dark ? '☀' : '☾'),
+      semanticLabel: dark ? StxKeys.themeLight : StxKeys.themeDark,
+      variant: ButtonVariant.ghost,
+      alignment: wide ? AlignmentDirectional.centerStart : Alignment.center,
+      onPressed: () => StxTheme.setMode(context, dark ? StxThemeMode.light : StxThemeMode.dark),
+    );
     final bar = StxBox(
       padding: const StxInsets.all(SpaceToken.sm),
       background: ColorToken.surface,
@@ -130,6 +154,7 @@ class StxAppShell<R extends Object> extends StatelessWidget {
                   ),
                 ...buttons,
                 const Spacer(),
+                themeToggle,
                 if (access.auth case final auth? when access.authenticated) ...[
                   if (auth.userName case final name?)
                     StxBox(
@@ -149,7 +174,10 @@ class StxAppShell<R extends Object> extends StatelessWidget {
               top: false,
               child: StxRow(
                 main: MainAxisAlignment.spaceEvenly,
-                children: [for (final b in buttons) Flexible(child: b)],
+                children: [
+                  for (final b in buttons) Flexible(child: b),
+                  themeToggle,
+                ],
               ),
             ),
     );
@@ -158,7 +186,9 @@ class StxAppShell<R extends Object> extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(width: 240, child: bar),
-              Expanded(child: child),
+              // The page route blocks the semantics of what is painted before it; without a
+              // boundary of its own that would hide the side rail from screen readers.
+              Expanded(child: Semantics(container: true, child: child)),
             ],
           )
         : Column(

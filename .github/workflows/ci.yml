@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve workspace
+        run: flutter pub get
+
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze (incl. the stx_lints plugin on the example apps)
+        run: dart analyze --fatal-infos
+
+      - name: Widgets-only packages
+        run: tool/check_widgets_only.sh
+
+      - name: Generated code is up to date
+        run: |
+          # The compiler's golden test compares a fresh build with lib/gen; this also catches files
+          # that would be created or deleted.
+          (cd examples/match_tracker && dart run stx_compiler:stx build)
+          (cd examples/stub_server && dart run stx_compiler:stx build)
+          test -z "$(git status --porcelain -- examples/*/lib/gen)" || { git status --short -- examples/*/lib/gen; exit 1; }
+
+      - name: Test (pure Dart packages, VM)
+        run: |
+          for pkg in packages/stx_annotations packages/stx_core packages/stx_icu packages/stx_http packages/stx_security packages/stx_search packages/stx_compiler packages/stx_lints examples/stub_server; do
+            (cd $pkg && dart test)
+          done
+
+      - name: Test (stx_http in Chrome, dart2js)
+        run: cd packages/stx_http && dart test -p chrome test/client_test.dart test/interceptors_test.dart
+
+      - name: Web transport compiles (dart2js, dart2wasm)
+        run: |
+          cd packages/stx_http
+          dart compile js tool/web_smoke.dart -o /tmp/smoke.js
+          dart compile wasm tool/web_smoke.dart -o /tmp/smoke.wasm
+
+      - name: Test (Flutter packages)
+        run: |
+          for pkg in stx_i18n stx_style stx_ui; do
+            (cd packages/$pkg && flutter test)
+          done
+
+      - name: Test (example app, end-to-end over the generated code)
+        run: cd examples/match_tracker && flutter test
+
+      - name: Example builds for the web
+        run: cd examples/match_tracker && flutter build web --release

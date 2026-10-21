@@ -1,3 +1,4 @@
+import '../config.dart';
 import '../contract/ir.dart';
 import '../diagnostics.dart';
 import '../i18n/i18n_frontend.dart';
@@ -5,6 +6,8 @@ import '../i18n/i18n_renderer.dart';
 import '../naming.dart';
 import 'annotation_frontend.dart';
 import 'ui_ir.dart';
+
+part 'list_plan.dart';
 
 /// How a form field is rendered.
 enum FieldKind { text, textArea, password, number, checkbox, select, autocomplete, date, dateTime, custom }
@@ -159,7 +162,23 @@ final class MapperPlan {
   final Set<String> imports;
 }
 
-final class FormPlan {
+/// A page with a route: a form or an overview.
+abstract interface class RoutedPlan {
+  String get name;
+  String get location;
+  RouteIR? get routeIR;
+
+  /// The page widget class.
+  String get page;
+
+  /// The route class.
+  String get route;
+
+  /// Dart expression of the title `Msg`.
+  String get title;
+}
+
+final class FormPlan implements RoutedPlan {
   const FormPlan({
     required this.form,
     required this.contract,
@@ -185,6 +204,7 @@ final class FormPlan {
 
   /// One group of alternative scope claims per operation the page uses.
   final List<List<String>> requires;
+  @override
   final String title;
   final Set<String> imports;
   final String bodyType;
@@ -192,10 +212,21 @@ final class FormPlan {
 
   String get base => form.name;
 
+  @override
+  String get name => form.name;
+
+  @override
+  String get location => form.location;
+
+  @override
+  RouteIR? get routeIR => form.route;
+
   String get controller => '${base}Form';
 
+  @override
   String get page => '${base}Page';
 
+  @override
   String get route => '${base.replaceFirst(RegExp(r'(Command|Form)$'), '')}Route';
 }
 
@@ -206,10 +237,40 @@ final class AppPlan {
     required this.mappers,
     required this.sources,
     required this.appTitle,
+    this.lists = const [],
   });
 
   final String package;
   final List<FormPlan> forms;
+  final List<ListPlan> lists;
+
+  /// Every page with a route, by path.
+  List<RoutedPlan> get routed => [
+    for (final page in <RoutedPlan>[...forms, ...lists])
+      if (page.routeIR != null) page,
+  ]..sort((a, b) => a.routeIR!.path.compareTo(b.routeIR!.path));
+
+  /// The routed page named [name] (a `UiAction` target).
+  RoutedPlan? routedNamed(String name) => routed.where((p) => p.name == name).firstOrNull;
+
+  /// The page [page] is embedded in: the route with the longest path that is a segment prefix of
+  /// its path (`/matches/new` in `/matches`); null: a top-level page.
+  RoutedPlan? parentOf(RoutedPlan page) {
+    final segments = _segments(page.routeIR!.path);
+    RoutedPlan? parent;
+    var depth = 0;
+    for (final other in routed) {
+      final s = _segments(other.routeIR!.path);
+      if (s.length >= segments.length || s.length <= depth) continue;
+      if (s.indexed.every((e) => segments[e.$1] == e.$2)) {
+        parent = other;
+        depth = s.length;
+      }
+    }
+    return parent;
+  }
+
+  static List<String> _segments(String path) => path.split('/').where((s) => s.isNotEmpty).toList();
   final List<MapperPlan> mappers;
   final List<DataSourcePlan> sources;
 
@@ -219,9 +280,18 @@ final class AppPlan {
 
 /// Merges the UI IR with the contracts and translations, and validates the result.
 final class AppPlanner {
-  AppPlanner({required this.ui, required this.contracts, required this.i18n, required this.diagnostics});
+  AppPlanner({
+    required this.ui,
+    required this.contracts,
+    required this.i18n,
+    required this.diagnostics,
+    this.searchConfig = const SearchConfig(),
+  });
 
   final UiIR ui;
+
+  /// stx.yaml `search:`: defaults of every overview.
+  final SearchConfig searchConfig;
   final List<ContractIR> contracts;
   final I18nIR i18n;
   final Diagnostics diagnostics;
@@ -236,17 +306,31 @@ final class AppPlanner {
       _source(source);
     }
     final forms = [for (final form in ui.forms) ?_form(form)];
+    final lists = [for (final list in ui.lists) ?_list(list)];
     final paths = <String, String>{};
-    for (final form in forms) {
-      if (form.form.route case final route?) {
+    for (final page in <RoutedPlan>[...forms, ...lists]) {
+      if (page.routeIR case final route?) {
         if (route.path.contains('{') || route.path.contains(':')) {
-          _error(UiCodes.route, form.form.location, 'route parameters are not supported yet ("${route.path}")');
+          _error(UiCodes.route, page.location, 'route parameters are not supported yet ("${route.path}")');
         }
         final existing = paths[route.path];
         if (existing != null) {
-          _error(UiCodes.route, form.form.location, 'route "${route.path}" is also used by $existing');
+          _error(UiCodes.route, page.location, 'route "${route.path}" is also used by $existing');
         }
-        paths[route.path] = form.form.name;
+        paths[route.path] = page.name;
+      }
+    }
+    final homes = [
+      for (final page in <RoutedPlan>[...forms, ...lists])
+        if (page.routeIR?.home ?? false) page,
+    ];
+    if (homes.length > 1) {
+      _error(UiCodes.route, homes[1].location, '@UiRoute(home: true) is also set on ${homes.first.name}');
+    }
+    for (final list in lists) {
+      for (final action in list.list.actions) {
+        if (paths.containsValue(action)) continue;
+        _error(UiCodes.route, list.location, 'UiAction($action): $action has no @UiRoute');
       }
     }
     return AppPlan(
@@ -254,6 +338,7 @@ final class AppPlanner {
       forms: forms,
       mappers: [..._mappers.values]..sort((a, b) => a.entity.name.compareTo(b.entity.name)),
       sources: [..._sources.values]..sort((a, b) => a.source.name.compareTo(b.source.name)),
+      lists: lists,
       appTitle: i18n.byKey('app.title') == null ? null : 'MsgApp.title',
     );
   }

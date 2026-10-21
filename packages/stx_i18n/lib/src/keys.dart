@@ -46,4 +46,25 @@ abstract final class StxKeys {
   static const sessionSignOut = MsgKey('stx.session.signOut');
   static const sessionFailed = MsgKey('stx.session.failed');
   static const sessionCancelled = MsgKey('stx.session.cancelled');
+  static const searchLabel = MsgKey('stx.search.label');
+  static const searchHint = MsgKey('stx.search.hint');
+  static const searchFilters = MsgKey('stx.search.filters');
+  static Msg searchFiltersActive(int count) => MsgArgs(const MsgKey('stx.search.filtersActive'), [count]);
+  static const searchShowResults = MsgKey('stx.search.showResults');
+  static const searchReset = MsgKey('stx.search.reset');
+  static const searchSortBy = MsgKey('stx.search.sortBy');
+  static const searchAscending = MsgKey('stx.search.ascending');
+  static const searchDescending = MsgKey('stx.search.descending');
+  static const searchFrom = MsgKey('stx.search.from');
+  static const searchTo = MsgKey('stx.search.to');
+  static const searchAny = MsgKey('stx.search.any');
+  static const searchYes = MsgKey('stx.search.yes');
+  static const searchNo = MsgKey('stx.search.no');
+  static const searchRemove = MsgKey('stx.search.remove');
+  static const pagerPrevious = MsgKey('stx.pager.previous');
+  static const pagerNext = MsgKey('stx.pager.next');
+  static Msg pagerRange(int from, int to, int total) => MsgArgs(const MsgKey('stx.pager.range'), [from, to, total]);
+  static Msg pagerPage(int page) => MsgArgs(const MsgKey('stx.pager.page'), [page]);
+  static const themeLight = MsgKey('stx.theme.light');
+  static const themeDark = MsgKey('stx.theme.dark');
 }

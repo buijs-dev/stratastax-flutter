@@ -25,6 +25,8 @@ void main() {
 
   test('what affects the build', () {
     expect(affectsBuild(config, at('stx.yaml')), isTrue);
+    expect(affectsBuild(config, at('stx.local.yaml')), isTrue);
+    expect(affectsBuild(config, at('stx.lock')), isTrue);
     expect(affectsBuild(config, at('openapi/platform.yaml')), isTrue);
     expect(affectsBuild(config, at('stx.tokens.yaml')), isTrue);
     expect(affectsBuild(config, at('i18n/nl.yaml')), isTrue);

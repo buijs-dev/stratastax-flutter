@@ -349,10 +349,13 @@ final class ContractRenderer {
           ..writeln('  static Map<String, String> _${base}Headers($paramsClass p) => {');
         for (final h in headers) {
           final key = Naming.stringLiteral(h.wireName);
+          final value = types.paramString(h.type, 'v');
           helpers.writeln(
             h.required
                 ? '    $key: ${types.paramString(h.type, 'p.${h.dartName}')},'
-                : '    if (p.${h.dartName} case final v?) $key: ${types.paramString(h.type, 'v')},',
+                : value == 'v'
+                ? '    $key: ?p.${h.dartName},'
+                : '    if (p.${h.dartName} case final v?) $key: $value,',
           );
         }
         helpers.writeln('  };');

@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:stx_icu/stx_icu.dart';
 
 import 'formats.dart';
 import 'msg.dart';
@@ -16,6 +17,10 @@ abstract base class StxMessages {
 
   /// Formats a message with placeholders; generated.
   String format(String key, List<Object?> args);
+
+  /// The placeholders of every message that has them, in the order of [MsgArgs.args], with their
+  /// type; generated. Lets a translation from a backend ([OverlayMessages]) use them by name.
+  Map<String, List<(String, ArgType)>> get arguments => const {};
 
   /// Plural rules, dates and numbers of [locale]; generated from CLDR.
   StxLocaleFormats get formats => const IsoFormats();

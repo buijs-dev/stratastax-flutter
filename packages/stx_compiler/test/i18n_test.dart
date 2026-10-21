@@ -105,6 +105,11 @@ void main() {
     expect(files['i18n/messages_nl.g.dart'], contains(r"'greeting' => 'Hoi ${args[0]}',"));
     expect(files['i18n/messages_nl.g.dart'], contains("'matchCreateCommand.gameId.label': 'Spel',"));
     expect(files['i18n/locales.g.dart'], contains("import 'messages_nl.g.dart' deferred as nl;"));
+    // The placeholders by name, for translations from a backend (OverlayMessages).
+    expect(files['i18n/arguments.g.dart'], contains("'greeting': [('name', ArgType.any)],"));
+    expect(files['i18n/arguments.g.dart'], contains("'stx.validation.minItems': [('min', ArgType.any)],"));
+    expect(files['i18n/arguments.g.dart'], isNot(contains('gameId')));
+    expect(files['i18n/messages_nl.g.dart'], contains('get arguments => messageArguments;'));
     expect(parsed.diagnostics.all, isEmpty);
   });
 

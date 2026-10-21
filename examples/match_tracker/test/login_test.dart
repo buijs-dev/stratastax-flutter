@@ -33,7 +33,7 @@ void main() {
     expect(find.text('Save'), findsOneWidget);
     expect(find.text('Gillian'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
-    expect(find.text('New game'), findsWidgets); // nav: game-create granted
+    expect(find.text('Games'), findsOneWidget); // nav: game-read granted
 
     final search = find.descendant(
       of: find.ancestor(of: find.text('Game *'), matching: find.byType(StxFieldFrame)).first,
@@ -51,8 +51,8 @@ void main() {
     await tester.tap(find.text('Sign in'));
     await _callback(tester, app);
     expect(find.text("You don't have access to this page"), findsOneWidget); // no match-create
-    expect(find.text('New match'), findsNothing);
-    expect(find.text('New game'), findsOneWidget);
+    expect(find.text('Matches'), findsNothing); // no match-read
+    expect(find.text('Games'), findsOneWidget);
   });
 
   testWidgets('sign out ends the session at the provider', (tester) async {
@@ -105,6 +105,7 @@ final class _Backend implements StxTransport {
 
   @override
   Future<StxResponse> send(StxRequest request) async {
+    if (request.uri.path.contains('/bundles/')) return StxResponse(status: 404); // nothing published
     if (request.uri.path.endsWith('/protocol/openid-connect/token')) {
       return StxResponse(
         status: 200,
@@ -147,6 +148,8 @@ Future<({AppServices services, _Browser browser, _Backend backend})> _start(
     AppConfig(
       platform: StxBackend(baseUrl: Uri.parse('http://api.test')),
       catalog: StxBackend(baseUrl: Uri.parse('http://catalog.test')),
+      i18n: StxBackend(baseUrl: Uri.parse('http://i18n.test')),
+      i18nTokens: const StaticTokenSource('test'),
       oidc: OidcConfig(
         issuer: Uri.parse('http://idp.test/realms/stratastax'),
         clientId: 'match-tracker',

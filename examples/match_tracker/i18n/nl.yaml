@@ -27,6 +27,24 @@ gameCreateCommand:
     label: Bronverwijzing
     help: Waar de spelgegevens vandaan komen
 
+gameOverview:
+  title: Spellen
+  displayName: { label: Naam }
+  scoreType: { label: Puntentelling }
+  minPlayers: { label: Min. spelers }
+  maxPlayers: { label: Max. spelers }
+  createdAt: { label: Toegevoegd }
+
+matchOverview:
+  title: Alle wedstrijden
+  gameName: { label: Spel }
+  gameId: { label: Spel }
+  playedAt: { label: Gespeeld op }
+  recorderName: { label: Vastgelegd door }
+  status: { label: Status }
+  editRequestsEnabled: { label: Wijzigingen toegestaan }
+
 enum:
   ScoreTypeV1: { score: Punten, time: Tijd, turns: Beurten, winLoss: Winst / verlies }
   WinConditionV1: { higherWins: Hoogste score wint, lowerWins: Laagste score wint }
+  MatchStatusV1: { draft: Concept, finalized: Definitief }

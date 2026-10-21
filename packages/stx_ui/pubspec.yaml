@@ -17,6 +17,7 @@ dependencies:
   stx_i18n: ^0.0.1
   meta: ^1.18.0
   stx_http: ^0.0.1
+  stx_search: ^0.0.1
   stx_security: ^0.0.1
 
 dev_dependencies:

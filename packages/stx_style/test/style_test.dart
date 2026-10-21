@@ -70,6 +70,33 @@ void main() {
     expect(identical(seen, _dark), isTrue);
   });
 
+  testWidgets('setMode switches the tokens and remembers the mode', (tester) async {
+    final store = _MemoryThemeStore();
+    late BuildContext ctx;
+    Widget app() => StxTheme(
+      light: _light,
+      dark: _dark,
+      store: store,
+      child: Builder(
+        builder: (context) {
+          ctx = context;
+          return const SizedBox();
+        },
+      ),
+    );
+    await tester.pumpWidget(app());
+    expect(StxTheme.isDarkOf(ctx), isFalse);
+    StxTheme.setMode(ctx, StxThemeMode.dark);
+    await tester.pump();
+    expect(identical(StxTheme.of(ctx), _dark), isTrue);
+    expect(StxTheme.modeOf(ctx), StxThemeMode.dark);
+    expect(store.mode, StxThemeMode.dark);
+    // A new start reads the remembered mode.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(app());
+    expect(StxTheme.isDarkOf(ctx), isTrue);
+  });
+
   testWidgets('breakpoint dependents rebuild only when a breakpoint is crossed', (tester) async {
     var builds = 0;
     final child = Builder(
@@ -90,4 +117,14 @@ void main() {
     await tester.pumpWidget(at(1300));
     expect(builds, 2);
   });
+}
+
+class _MemoryThemeStore implements ThemeModeStore {
+  StxThemeMode? mode;
+
+  @override
+  StxThemeMode? read() => mode;
+
+  @override
+  void write(StxThemeMode mode) => this.mode = mode;
 }

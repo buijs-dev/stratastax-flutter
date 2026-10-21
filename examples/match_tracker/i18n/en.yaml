@@ -29,6 +29,24 @@ gameCreateCommand:
     label: Source reference
     help: Where the game data comes from
 
+gameOverview:
+  title: Games
+  displayName: { label: Name }
+  scoreType: { label: Scoring }
+  minPlayers: { label: Min. players }
+  maxPlayers: { label: Max. players }
+  createdAt: { label: Added }
+
+matchOverview:
+  title: Matches
+  gameName: { label: Game }
+  gameId: { label: Game }
+  playedAt: { label: Played at }
+  recorderName: { label: Recorded by }
+  status: { label: Status }
+  editRequestsEnabled: { label: Edits allowed }
+
 enum:
   ScoreTypeV1: { score: Points, time: Time, turns: Turns, winLoss: Win / loss }
   WinConditionV1: { higherWins: Highest score wins, lowerWins: Lowest score wins }
+  MatchStatusV1: { draft: Draft, finalized: Final }

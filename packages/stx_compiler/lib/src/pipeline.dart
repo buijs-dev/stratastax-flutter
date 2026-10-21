@@ -15,6 +15,7 @@ import 'i18n/i18n_frontend.dart';
 import 'i18n/i18n_renderer.dart';
 import 'output.dart';
 import 'package_locator.dart';
+import 'remote_source.dart';
 import 'style/style_frontend.dart';
 import 'style/style_ir.dart';
 import 'style/style_renderer.dart';
@@ -61,10 +62,19 @@ final class BuildResult {
 /// phase 2  lib/**.dart (analyzer, resolved against phase 1) → UiIR
 ///          UiIR × ContractIR × I18nIR → AppPlan → render + write lib/gen/app
 /// ```
+///
+/// Before phase 1 the remote sources (specs, tokens) are fetched into the cache and checked
+/// against stx.lock.
 final class StxPipeline {
-  const StxPipeline(this.projectDir);
+  const StxPipeline(this.projectDir, {this.offline = false, this.fetch});
 
   final String projectDir;
+
+  /// Only use cached remote sources.
+  final bool offline;
+
+  /// Null: [httpFetch].
+  final SourceFetch? fetch;
 
   static const _phase1Dirs = ['contract', 'style', 'i18n'];
 
@@ -73,7 +83,14 @@ final class StxPipeline {
   Future<BuildResult> run({bool write = true}) async {
     final diagnostics = Diagnostics();
     final config = StxConfig.load(projectDir, diagnostics);
-    if (config == null) return BuildResult(diagnostics: diagnostics);
+    if (config == null || diagnostics.hasErrors) return BuildResult(diagnostics: diagnostics);
+    await RemoteSources(
+      projectDir,
+      config.sources,
+      offline: offline,
+      fetch: fetch,
+    ).resolve(diagnostics, updateLock: write);
+    if (diagnostics.hasErrors) return BuildResult(diagnostics: diagnostics);
     final packages = PackageLocator.forProject(projectDir);
     final dependencies = _dependencies(projectDir);
 
@@ -86,10 +103,12 @@ final class StxPipeline {
     if (packages.lib('stx_style') case final styleLib? when dependencies.contains('stx_style')) {
       style = StyleFrontend(diagnostics).parseFiles(
         defaults: p.join(styleLib, 'defaults', 'defaults.tokens.yaml'),
+        base: config.tokensBase,
+        displayBase: config.displayTokensBase,
         app: config.tokens,
         displayApp: config.displayTokens,
       );
-    } else if (config.tokens != null) {
+    } else if (config.tokens != null || config.tokensBase != null) {
       diagnostics.error(
         StyleCodes.missing,
         'stx.yaml configures tokens but the app does not depend on stx_style',
@@ -148,7 +167,7 @@ final class StxPipeline {
     AppPlan? app;
     var missingKeys = const <String, String>{};
     final appFiles = <GeneratedFile>[];
-    if (ui.forms.isNotEmpty || ui.dataSources.isNotEmpty) {
+    if (ui.forms.isNotEmpty || ui.dataSources.isNotEmpty || config.i18n.remote != null) {
       if (style == null || i18n == null) {
         diagnostics.error(
           UiCodes.annotation,
@@ -156,7 +175,13 @@ final class StxPipeline {
           location: StxConfig.fileName,
         );
       } else if (!diagnostics.hasErrors) {
-        final planner = AppPlanner(ui: ui, contracts: contracts, i18n: i18n, diagnostics: diagnostics);
+        final planner = AppPlanner(
+          ui: ui,
+          contracts: contracts,
+          i18n: i18n,
+          diagnostics: diagnostics,
+          searchConfig: config.search,
+        );
         app = planner.plan();
         missingKeys = planner.missingKeys;
         if (!diagnostics.hasErrors) {
@@ -168,6 +193,8 @@ final class StxPipeline {
                 security: config.security,
                 backends: config.backends,
                 contractBackends: {for (final c in config.contracts) Naming.snake(c.name): c.backend},
+                i18nRemote: config.i18n.remote,
+                search: config.search,
               ).render().map(formatter.format),
             );
           } on FormatterException catch (e) {

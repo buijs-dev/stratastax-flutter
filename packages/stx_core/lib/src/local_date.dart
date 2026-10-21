@@ -30,8 +30,7 @@ final class LocalDate implements Comparable<LocalDate> {
   }
 
   static LocalDate parse(String source) =>
-      tryParse(source)
-          ?? (throw FormatException('Invalid date, expected YYYY-MM-DD', source));
+      tryParse(source) ?? (throw FormatException('Invalid date, expected YYYY-MM-DD', source));
 
   final int year;
   final int month;

@@ -21,6 +21,46 @@ const firstButtonExtension = 8;
 
 const modes = ['light', 'dark'];
 
+/// The flat component specs of overviews (`components.table`, `.chip`, `.panel`): property → kind
+/// (`color`, `space`, `radius`, `text` or `number`). Unset properties keep the spec's default.
+const componentKinds = {
+  'table': {
+    'headerBackground': 'color',
+    'headerForeground': 'color',
+    'background': 'color',
+    'backgroundAlt': 'color',
+    'foreground': 'color',
+    'divider': 'color',
+    'padX': 'space',
+    'padY': 'space',
+    'header': 'text',
+    'text': 'text',
+  },
+  'chip': {
+    'background': 'color',
+    'foreground': 'color',
+    'selectedBackground': 'color',
+    'selectedForeground': 'color',
+    'border': 'color',
+    'padX': 'space',
+    'padY': 'space',
+    'radius': 'radius',
+    'text': 'text',
+  },
+  'panel': {
+    'background': 'color',
+    'foreground': 'color',
+    'border': 'color',
+    'padding': 'space',
+    'gap': 'space',
+    'radius': 'radius',
+    'width': 'number',
+  },
+};
+
+/// `table` → `TableSpec`.
+String componentSpecType(String name) => '${name[0].toUpperCase()}${name.substring(1)}Spec';
+
 final class TextIR {
   const TextIR({required this.sizes, this.family, this.weight = 400, this.height, this.letterSpacing});
 
@@ -69,6 +109,7 @@ final class StyleIR {
     required this.buttonExtensions,
     required this.field,
     required this.focus,
+    this.components = const {},
     required this.source,
   });
 
@@ -96,6 +137,9 @@ final class StyleIR {
 
   /// FocusSpec property → token name or number.
   final Map<String, Object> focus;
+
+  /// Per [componentKinds] entry: property → token name or number.
+  final Map<String, Map<String, Object>> components;
   final String source;
 
   Map<String, Object?> toJson() => {

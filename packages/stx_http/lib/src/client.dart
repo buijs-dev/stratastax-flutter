@@ -43,6 +43,21 @@ final class StxClient {
     Endpoint<P, B, R> endpoint, {
     required P params,
     required B body,
+  }) async => (await _exchange(endpoint, params, body, conditional: false)).map((reply) => reply!);
+
+  /// Like [exchange], for a conditional request (params with `If-None-Match`): `Ok(null)` when the
+  /// server answers `304 Not Modified`, so the copy the caller has is still current.
+  Future<Result<StxReply<R>?, Problem>> exchangeIfModified<P, B, R>(
+    Endpoint<P, B, R> endpoint, {
+    required P params,
+    required B body,
+  }) => _exchange(endpoint, params, body, conditional: true);
+
+  Future<Result<StxReply<R>?, Problem>> _exchange<P, B, R>(
+    Endpoint<P, B, R> endpoint,
+    P params,
+    B body, {
+    required bool conditional,
   }) async {
     final request = _request(endpoint, params, body);
     final StxResponse response;
@@ -52,6 +67,7 @@ final class StxClient {
       return Err(Problem.network(e));
     }
 
+    if (conditional && response.status == 304) return const Ok(null);
     if (!response.isSuccess) {
       return Err(Problem.decode(_tryJson(response.body), fallbackStatus: response.status));
     }

@@ -15,6 +15,7 @@ export 'src/naming.dart';
 export 'src/output.dart';
 export 'src/package_locator.dart';
 export 'src/pipeline.dart';
+export 'src/remote_source.dart';
 export 'src/scan.dart';
 export 'src/watch.dart';
 export 'src/style/style_frontend.dart';

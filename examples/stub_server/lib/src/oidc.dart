@@ -41,6 +41,11 @@ final stubUsers = <String, StubUser>{
   'viewer': StubUser('viewer', 'Vera Viewer', 'viewer@stratastax.test', _read, 'read-only'),
 };
 
+/// Confidential clients with a service account (client credentials): client id → (secret, roles).
+final stubServiceAccounts = <String, (String, List<String>)>{
+  'match-tracker-i18n': ('stub-secret', [Scope.bundleRead.claim]),
+};
+
 /// Social logins (`kc_idp_hint`) land on these users without a choice page.
 const _social = {'google': 'player', 'github': 'admin'};
 
@@ -55,7 +60,8 @@ final class _Code {
 }
 
 /// Keycloak-compatible endpoints under `/realms/<realm>/protocol/openid-connect/`: Authorization
-/// Code with PKCE (S256 only), refresh-token rotation, logout. Tokens are HS256 JWTs signed with a
+/// Code with PKCE (S256 only), refresh-token rotation, client credentials for
+/// [stubServiceAccounts], logout. Tokens are HS256 JWTs signed with a
 /// stub secret; [verify] checks them for the API.
 final class OidcStub {
   OidcStub({this.realm = 'stratastax', this.accessTtl = const Duration(minutes: 5), DateTime Function()? clock})
@@ -132,6 +138,7 @@ final class OidcStub {
 
   Future<Response> _token(Request request) async {
     final form = Uri.splitQueryString(await request.readAsString());
+    if (form['grant_type'] == 'client_credentials') return _clientCredentials(form);
     StubUser? user;
     switch (form['grant_type']) {
       case 'authorization_code':
@@ -150,7 +157,7 @@ final class OidcStub {
         user = _refresh.remove(form['refresh_token']); // rotation: a refresh token works once
         if (user == null) return _oauthError('invalid_grant', 'unknown refresh token');
       default:
-        return _oauthError('unsupported_grant_type', 'use authorization_code or refresh_token');
+        return _oauthError('unsupported_grant_type', 'use authorization_code, refresh_token or client_credentials');
     }
     final refresh = _token32();
     _refresh[refresh] = user;
@@ -159,6 +166,28 @@ final class OidcStub {
         'access_token': _accessToken(user),
         'id_token': _jwt({'sub': user.id, 'name': user.name, 'email': user.email, ..._times()}),
         'refresh_token': refresh,
+        'token_type': 'Bearer',
+        'expires_in': accessTtl.inSeconds,
+      }),
+      headers: {'Content-Type': 'application/json', 'Cache-Control': 'no-store'},
+    );
+  }
+
+  /// A service account signs in as itself: no user, no refresh token (Keycloak's `service-account-<client>`).
+  Response _clientCredentials(Map<String, String> form) {
+    final account = stubServiceAccounts[form['client_id']];
+    if (account == null || account.$1 != form['client_secret']) {
+      return _oauthError('invalid_client', 'unknown client or wrong secret', status: 401);
+    }
+    final client = form['client_id']!;
+    return Response.ok(
+      jsonEncode({
+        'access_token': _jwt({
+          'sub': 'service-account-$client',
+          'azp': client,
+          'realm_access': {'roles': account.$2},
+          ..._times(),
+        }),
         'token_type': 'Bearer',
         'expires_in': accessTtl.inSeconds,
       }),
@@ -195,8 +224,8 @@ final class OidcStub {
 
   String _token32() => base64Url.encode(List.generate(24, (_) => _random.nextInt(256))).replaceAll('=', '');
 
-  static Response _oauthError(String error, String description) => Response(
-    400,
+  static Response _oauthError(String error, String description, {int status = 400}) => Response(
+    status,
     body: jsonEncode({'error': error, 'error_description': description}),
     headers: {'Content-Type': 'application/json'},
   );

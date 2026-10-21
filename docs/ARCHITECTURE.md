@@ -32,10 +32,10 @@ packages it generates against are built only on `flutter/widgets.dart` and are f
 
 | Input | Provides |
 |---|---|
-| OpenAPI contract(s) | Models, validation, endpoints, scopes |
-| `stx.tokens.yaml` | Design tokens |
+| OpenAPI contract(s), local or remote (pinned in `stx.lock`) | Models, validation, endpoints, scopes |
+| `stx.tokens.yaml`, optionally on a brand layer (`tokens.base`) | Design tokens |
 | `i18n/*.yaml` | All texts |
-| Annotated Dart classes in `lib/` | Forms, pages, routes, data sources, custom fields |
+| Annotated Dart classes in `lib/` | Forms, overviews, pages, routes, data sources, custom fields |
 | `stx.yaml` | Configuration: backends, contracts, security, output |
 
 The generated code ends up in `lib/gen/` of the consuming app.
@@ -74,20 +74,25 @@ Everything is in a single Dart pub workspace (`pubspec.yaml` in the root).
 | `stx_annotations` | `meta` (for `@Target`) | Const annotation classes only |
 | `stx_core` | `meta` | `Result<T,E>`, `Problem` (RFC 9457), `UiFieldValidation`, `UiFormat`, `FieldError`, `Uuid`/`Email` extension types, `StxScope`/`ScopeRequirement`, `Endpoint<P,B,R>`, `Json` helpers |
 | `stx_http` | `stx_core`, `web` | Transport (io/web via conditional import), interceptor chain, `StxClient.send` |
-| `stx_security` | `stx_core`, `stx_http` | OIDC Authorization Code + PKCE (Keycloak, `kc_idp_hint`), `Session`, `SecureStore`, single-flight refresh, JWT → `Set<StxScope>` |
+| `stx_icu` | – | The ICU MessageFormat subset: parser, AST, `ArgType` (pure Dart; the compiler compiles it, `stx_i18n` interprets it) |
+| `stx_search` | `stx_core`, `stx_http` | Search on list endpoints, as stratastax-search on the server: `Rsql` (encoder with quoting and `=ilike=` escaping), `SortSpec`, `StxSearchQuery`, `StxPage`, `StxSearchService` (pages and totals of one list endpoint), `StxSearchCache` (pure Dart) |
+| `stx_security` | `stx_core`, `stx_http` | OIDC Authorization Code + PKCE (Keycloak, `kc_idp_hint`), `Session`, `SecureStore`, single-flight refresh, JWT → `Set<StxScope>`; `ServiceAccountTokens` (client credentials), `StaticTokenSource` |
 | `stx_style` | `flutter/widgets` | Token schema (fixed semantic slots), `StxTokens`, `StxTheme`, `BreakpointScope`, `Responsive<T>`, `defaults.tokens.yaml` |
-| `stx_i18n` | `flutter/widgets` | `Msg`/`MsgKey`, `StxMessages`, `StxLocaleScope`, `LocaleStore`, `Plural`, framework translations `stx.*` (en, nl) |
-| `stx_ui` | `stx_core`, `stx_http`, `stx_style`, `stx_i18n`, `flutter/widgets` | Primitives, fields, form and page shells, `StxGuard`, router runtime on Navigator 2.0, `StxServices` |
-| `stx_compiler` | `analyzer`, `yaml`, `args` | CLI `stx`: front-ends, IR, validators, renderers |
+| `stx_i18n` | `flutter/widgets`, `stx_icu` | `Msg`/`MsgKey`, `StxMessages`, `StxLocaleScope`, `LocaleStore`, `Plural`, framework translations `stx.*` (en, nl); `OverlayMessages`, `TranslationSource`/`TranslationCache` for translations from a backend |
+| `stx_ui` | `stx_core`, `stx_http`, `stx_search`, `stx_style`, `stx_i18n`, `flutter/widgets` | Primitives, fields, form and overview shells, filters and `StxListController`, `StxGuard`, router runtime on Navigator 2.0, `StxServices`; re-exports `stx_search` |
+| `stx_compiler` | `analyzer`, `yaml`, `args`, `stx_icu` | CLI `stx`: front-ends, IR, validators, renderers |
 | `stx_lints` | `analyzer`, `analysis_server_plugin` | Native analyzer plugin (in the `analysis_options.yaml` of the workspace root) with `stx_no_material_import`, `stx_no_raw_color`, `stx_no_raw_insets`, `stx_no_string_in_ui`, `stx_no_generated_tokens`; applies to `lib/` of apps, not to `lib/gen` and the stx packages |
 | `examples/match_tracker` | everything | Reference app on the platform contract |
 | `examples/stub_server` | `stx_core`, `shelf` | Contract-conformant API stub on the generated contract code (models, codecs, server-side validation); plus Keycloak-compatible OIDC endpoints (PKCE, refresh rotation, logout, HS256 tokens) and bearer/scope checks per operation (401/403 as problem) |
 
 ```
 stx_annotations      stx_core ◄─── stx_http ◄─── stx_security
-                         ▲
-stx_style ◄──┐           │
-stx_i18n  ◄──┴──── stx_ui ┘
+                         ▲            ▲
+                         │       stx_search
+stx_style ◄──┐           │            ▲
+stx_i18n  ◄──┴──── stx_ui ┴───────────┘
+   │
+   └──► stx_icu ◄── stx_compiler
 
 stx_compiler ──(only names/const values via analyzer)──► stx_annotations
 ```
@@ -100,12 +105,13 @@ and additionally with the lint `stx_no_material_import`.
 
 | Layer | Widgets |
 |---|---|
-| Layout | `StxBox` (padding/radius/bg/border via tokens), `StxRow`, `StxColumn` (`gap: SpaceToken`), `StxStack`, `StxResponsive` |
+| Layout | `StxBox` (padding/radius/bg/border via tokens), `StxRow`, `StxColumn` (`gap: SpaceToken`), `StxInsets` |
 | Text | `StxText(Msg, style: TextToken, color: ColorToken)` |
-| Interaction | `StxButton(Msg, variant: ButtonVariant)`, `StxPressable`, `StxFocusRing` (via `FocusableActionDetector`) |
-| Fields | `StxTextField`, `StxTextArea` (on `EditableText`), `StxNumberField`, `StxSelect<T>`, `StxAutocompleteField<T>` (`OverlayPortal`), `StxDateTimeField`, `StxCheckbox`, `StxFieldWidget<T>` (base for custom) |
-| Form | `StxFormController`, `StxField<T>` (ValueNotifier and error), `StxFieldBuilder`, `StxFormScaffold` |
-| App | `StxGuard`, `StxNav`, `StxAppShell` (responsive rail or bottom), `StxRouterConfig`, `StxServices<T>` |
+| Interaction | `StxButton(Msg, variant: ButtonVariant)`, `StxPressable` (focus ring, semantics, hover), `StxChip` |
+| Fields | `StxTextField` (on `EditableText`), `StxFieldFrame`, `StxInputBox`; bound to a `StxField<T>`: `StxFormText`, `StxFormNumber<T>`, `StxFormCheckbox`, `StxFormSelect<T>`, `StxAutocomplete<T>` (`OverlayPortal`), `StxFormDate`, `StxFormDateTime`, `StxCalendar`; `StxFieldWidget<T>` (base for custom) |
+| Form | `StxFormController`, `StxField<T>` (value and error), `StxFieldBuilder`, `StxFormScaffold` |
+| Overview | `StxListController<I>`, the filters (`StxTextFilter`, `StxChoiceFilter<T>`, `StxBoolFilter`, `StxRangeFilter<T>`, `StxDateRangeFilter`, `StxSourceFilter<T>`), `StxSortOption`, `StxListColumn<I>`, `StxListScaffold<I>` (panel, table/cards, pager) |
+| App | `StxApp`, `StxGuard`, `StxAppShell` (responsive rail or bottom bar), `StxRouter`, `StxRoutes`, `StxServices<T>`, `StxSignIn`, `StxForbidden` |
 
 Semantics and focus traversal are in the base widgets, so every derived widget is accessible.
 
@@ -142,9 +148,12 @@ Phase 2 resolves against the output of phase 1, which is why the two phases run 
 | Command | Does |
 |---|---|
 | `stx build` | Phase 1 and 2. Exit code ≠ 0 on errors. |
-| `stx watch` | Builds, and again on every change that can affect the output (stx.yaml, contracts, tokens, `i18n/*.yaml`, `lib/**.dart` outside `lib/gen`), debounced. Only changed files are written, so hot reload sees exactly what changed. A rebuild takes ~4 s (mostly the analyzer). |
+| `stx watch` | Builds, and again on every change that can affect the output (stx.yaml, stx.local.yaml, stx.lock, local contracts and tokens, `i18n/*.yaml`, `lib/**.dart` outside `lib/gen`), debounced. Only changed files are written, so hot reload sees exactly what changed. A rebuild takes ~4 s (mostly the analyzer). |
 | `stx scan` | Dumps the IR as YAML: backends, security, per form the route/operation/backend/scopes and per field the contract property, merged rules and keys, datasources, mappers, and summaries of the contract, style and i18n IR. `--contracts` adds the full `ContractIR`. |
 | `stx i18n sync` | Fills in missing keys (see §9). Never runs implicitly. |
+| `stx sources update` | Fetches the latest version of every remote source, prints what changed (for a contract: `info.version` and the added and removed operations) and updates `stx.lock`. |
+
+`--offline` (before the command: `stx --offline build`) only uses the cached remote sources.
 
 ### Reading annotations
 
@@ -188,19 +197,60 @@ final class FieldBinding { final FieldIR field; final PropertyIR? property; fina
 See [`examples/match_tracker/stx.yaml`](../examples/match_tracker/stx.yaml).
 
 ```yaml
+sources:                                   # optional; aliases for remote (or local) bases, see below
+  stratastax: https://docs.stratastax.dev/
 backends:                                  # optional; without it: a single backend `api` (STX_API_BASE_URL)
   platform: { baseUrl: http://localhost:8080, auth: oidc }   # runtime: --dart-define=STX_PLATFORM_BASE_URL
   catalog:  { baseUrl: http://localhost:8081, auth: none }   # STX_CATALOG_BASE_URL
 contracts:
-  platformV1: { spec: openapi/platform-v1.yaml, modelSuffix: V1, apiSuffix: ApiV1, backend: platform }
-  catalogV1:  { spec: openapi/catalog-v1.yaml, modelSuffix: V1, apiSuffix: ApiV1, backend: catalog }
-tokens: stx.tokens.yaml
+  platformV1: { spec: stratastax:openapi/stratastax.platform.api-v1.yaml, modelSuffix: V1, apiSuffix: ApiV1, backend: platform }
+  catalogV1:  { spec: openapi/catalog-v1.yaml, modelSuffix: V1, apiSuffix: ApiV1, backend: catalog }   # a local file
+tokens:                                    # or just `tokens: stx.tokens.yaml`
+  base: stratastax:design/stratastax.tokens.yaml   # brand layer: stx_style defaults ← base ← file
+  file: stx.tokens.yaml
 i18n: { dir: i18n, base: en, locales: [en, nl], missing: error, deferred: true }
 security:
   oidc: { issuer: http://localhost:9000/realms/stratastax, clientId: match-tracker }  # runtime: --dart-define=STX_OIDC_ISSUER
   social: { google: Google, github: GitHub }   # kc_idp_hint → name on the button (a list is also allowed)
+search:                                    # optional; defaults of every @UiListPage (which can override them)
+  pageSize: 20                             # limit, 1–100
+  cache: { mode: memory, ttl: 60, maxEntries: 200 }   # none | memory | staleWhileRevalidate; ttl in seconds
 output: lib/gen
 ```
+
+### Remote sources
+
+A file that stx.yaml refers to (`contracts.*.spec`, `tokens.file`, `tokens.base`) is one of:
+
+- a path relative to the project;
+- an `https://` URL;
+- `<source>:<path>`, with `<source>` an alias from `sources:`; the path is resolved against its
+  base, a URL or a local directory.
+
+A remote file is fetched into `.dart_tool/stx/sources/<host>/<path>`, and the frontends read that
+copy. They never see the network. `stx.lock` (committed) holds the sha256 of every remote file,
+because docs.stratastax.dev always serves the latest version:
+
+| Situation in a build | Result |
+|---|---|
+| Cached, and the hash matches the lock (or the file is not locked yet) | The cache, without the network |
+| Not cached (a fresh checkout) | Fetched; the hash must match the lock (`STX-R002` otherwise) |
+| Not locked yet | Fetched and added to `stx.lock` |
+| `--offline` and not cached | `STX-R001` |
+
+`stx.lock` only keeps the sources stx.yaml still uses; `stx scan` (a dry run) does not write it.
+`stx sources update` accepts new versions.
+
+To build against local checkouts (e.g. a contract change that is not published yet), override an
+alias in `stx.local.yaml`. It is not committed and only accepts `sources:`:
+
+```yaml
+sources:
+  stratastax: ../../../stratastax-docs/public   # after `npm run sync` there
+```
+
+A local source is not cached or locked. Diagnostics and generated headers show the reference as
+written (`stratastax:openapi/…`), so the output does not change with an override.
 
 ---
 
@@ -209,11 +259,16 @@ output: lib/gen
 The defaults follow shadcn/ui (zinc neutrals, radius 6, compact 14px UI text, headings with
 negative letter spacing) and live in
 [`stx_style/lib/defaults/defaults.tokens.yaml`](../packages/stx_style/lib/defaults/defaults.tokens.yaml).
-An app overrides them in its own [`stx.tokens.yaml`](../examples/match_tracker/stx.tokens.yaml).
+An app overrides them in its own [`stx.tokens.yaml`](../examples/match_tracker/stx.tokens.yaml),
+optionally on top of a brand layer (`tokens.base`). For Stratastax apps that layer is
+[stratastax-design](https://github.com/buijs-dev/stratastax-design), published on
+`https://docs.stratastax.dev/design/stratastax.tokens.yaml`. The brand layer sets every slot, so
+the app only adds what is its own under `extend`.
 
 What the build does:
 
-1. The defaults and the app's `stx.tokens.yaml` are deep-merged (the app wins per key).
+1. The defaults, the brand layer and the app's `stx.tokens.yaml` are deep-merged (the upper
+   layer wins per key).
 2. References (`{palette.blue.700}`, also `{color.primary}`) are resolved per mode, with
    detection of unknown and cyclic refs (`STX-S001`).
 3. Every slot must have a value and every value must be valid (`STX-S002`, with path).
@@ -250,7 +305,7 @@ The runtime library is compiled before any consumer YAML exists. That is why `st
 | `space` | `none xs sm md lg xl x2l x3l` |
 | `radius` | `none sm md lg full` |
 | `text` | `header1 header2 header3 body label caption` |
-| `components` | `button.{primary,secondary,danger,ghost}`, `field.{base,error,focus}`, … |
+| `components` | `button.{primary,secondary,danger,ghost}`, `field`, `focus`, `table` (header, rows, divider), `chip` (normal and selected), `panel` (the filter panel, incl. its width) |
 
 - `stx_ui` uses only these slots.
 - The YAML fills in values. Missing slots come from `stx_style/defaults.tokens.yaml`.
@@ -297,8 +352,9 @@ A `Color` can never end up in a widget, because no `stx_ui` API accepts one.
 
 ### Input
 
-The input is the **bundled** OpenAPI artifact of stratastax-contract (`build/openapi/*.yaml`), so
-all `$ref`s are local (`#/components/...`). External refs give `STX-C003` with a hint.
+The input is the **bundled** OpenAPI artifact of stratastax-contract (`build/openapi/*.yaml`, also
+published on `https://docs.stratastax.dev/openapi/`, see §3 *Remote sources*), so all `$ref`s are
+local (`#/components/...`). External refs give `STX-C003` with a hint.
 
 Supported:
 
@@ -398,8 +454,18 @@ Each contract belongs to a backend (`backends:` in stx.yaml). Per backend the co
   `extension type PlatformClient(StxClient http)` whose `send`/`fetch`/`submit`/`exchange` accept
   only a `PlatformEndpoint`.
 
-`services.catalog.submit(MatchesApiV1.createMatch, …)` therefore does not compile. Only backends
-with `auth: oidc` get the session's `BearerAuthInterceptor`.
+`services.catalog.submit(MatchesApiV1.createMatch, …)` therefore does not compile. How a client
+authenticates is `auth:` of its backend:
+
+| `auth` | Token of `BearerAuthInterceptor` | Override |
+|---|---|---|
+| `none` | none | – |
+| `oidc` (default with `security:`) | the user's `Session` | `AppConfig.access` (then no token) |
+| `serviceAccount` | `ServiceAccountTokens`: client credentials of `serviceAccount: { clientId, scopes, issuer? }` (issuer: that of `security.oidc` by default, or `--dart-define=STX_<BACKEND>_ISSUER`), secret from `--dart-define=STX_<BACKEND>_CLIENT_SECRET` | `AppConfig.<backend>Tokens` |
+| `token` | `StaticTokenSource` from `--dart-define=STX_<BACKEND>_TOKEN` | `AppConfig.<backend>Tokens` (e.g. a token from a backend for frontend) |
+
+The tokens of a `serviceAccount` or `token` backend are independent of the session: they are there
+before and after a login, and `start()` obtains them alongside the session (without waiting).
 
 ### HTTP (`stx_http`)
 
@@ -454,7 +520,7 @@ A consuming app contains:
 For a complete example, see [`examples/match_tracker/lib`](../examples/match_tracker/lib).
 
 ```dart
-@UiRoute('/matches/new', nav: UiNav.primary)
+@UiRoute('/matches/new')                            // embedded in /matches (see Overviews)
 @UiForm(submit: MatchesApiV1.createMatch)
 @UiRequires([Scope.ghostPlayerRead]) // ParticipantsField searches ghost players
 @DomainEntity()
@@ -522,12 +588,13 @@ renders `lib/gen/app/`:
 
 | File | Contents |
 |---|---|
+| `pages/<view>.page.g.dart` | For a `@UiListPage`: `<View>Page` with its `requires`, a `StxListController` with the filters and sorts, the columns and `StxListScaffold` |
 | `forms/<command>.form.g.dart` | `<Command>Form extends StxFormController`: a `StxField` per field, merged `UiFieldValidation` constants, a static validator per field, `toCommand()`, `toContract()`, `contractFields` (to show server errors at the right field) |
 | `pages/<command>.page.g.dart` | `<Command>Page` with `static const requires = ScopeRequirement([...])`, `StxGuard`, `StxFormScaffold` and the field widgets |
 | `mappers.g.dart` | `<Entity>Mapper.toContract` for nested `@DomainEntity` classes |
 | `routes.g.dart` | `sealed class AppRoute`, `parseRoute`/`routeSegments`/`buildRoute`/`requiredScopes` as exhaustive `switch`es, `navItems`, `const appRoutes` |
 | `config.g.dart` | `AppConfig`: per backend a `StxBackend` (base URL via `--dart-define=STX_<BACKEND>_BASE_URL`, extra interceptors), access, OIDC, transport, locale store |
-| `services.g.dart` | `AppServices`: per backend a typed client, the session, and a `StxEndpointSource` per `@UiDataSource`; plus the `<Backend>Client` wrappers |
+| `services.g.dart` | `AppServices`: per backend a typed client, the session, a `StxEndpointSource` per `@UiDataSource`, the shared `searchCache` and a `StxSearchService` per `@UiListPage`; plus the `<Backend>Client` wrappers |
 | `app.g.dart` | `runStxApp`, `AppRoot` on `StxApp` (= `WidgetsApp.router`) with router, shell, tokens, translations and access |
 
 Key excerpt from `match_create_command.form.g.dart`:
@@ -577,6 +644,96 @@ Runtime behavior of a form (`StxFormController`):
 - `violations` from a validation `Problem` from the server reach the right field via
   `contractFields` (`FieldError.server(code)`), the rest as a banner (`stx.problem.*`).
 
+### Overviews (`@UiListPage`)
+
+An overview is declared like a form: a `@DomainEntity` class whose fields are paths into the
+item schema of a list operation. The search annotations mirror `@SearchFilter` / `@SearchSort`
+of stratastax-entity on the server:
+
+```dart
+@UiRoute('/matches', nav: UiNav.primary, home: true)
+@UiListPage(
+  list: MatchesApiV1.listMatches,
+  count: MatchesApiV1.countMatches,                  // optional: "1–20 of 45" instead of "Page 1"
+  panel: UiSearchPanel(layout: UiPanelLayout.side),  // auto (default) | side | top, start | end
+  cache: UiCache(mode: UiCacheMode.staleWhileRevalidate, ttlSeconds: 60),
+  actions: [UiAction(MatchCreateCommand)],           // a "New match" button next to the title
+)
+@DomainEntity()
+final class MatchOverview {
+  @UiColumn(order: 10, primary: true, flex: 2)
+  @ContractProperty('game.displayName')              // a path; nullable steps need a nullable field
+  @SearchText(alias: 'gameName')                     // the search box: =ilike= on every such field, OR
+  final String gameName;
+
+  @ContractProperty('game.id')
+  @SearchFilter(source: GameSearchSource)            // filter only: pick a game, gameId==…
+  final GameId gameId;
+
+  @UiColumn(order: 20)
+  @SearchFilter()                                    // date-time: from–to (whole local days)
+  @SearchSort(direction: SearchDirection.desc, initial: true)
+  final DateTime playedAt;
+  …
+}
+```
+
+**Embedded pages.** A route is embedded in the route with the longest path that is a segment
+prefix of its own: `/matches/new` in `/matches`. It is left out of the navigation (no `nav:`) and
+opened with a `UiAction` on the overview: a `StxRouteButton` next to the title, labelled with the
+title of that page and hidden without its scopes. The button pushes the page, so after saving
+(`UiNavigate.back`) the overview is on top again and loads again, without the cache entries the
+form invalidated. While the embedded page is open, the navigation keeps its overview active
+(`StxNavigator.isActive`). A deep link opens the embedded page alone (the overview would start
+requests nobody sees); back, the system back button included, then goes to the overview
+(`parentRoute` in `routes.g.dart`).
+
+The list operation must have the four query parameters of stratastax-contract (`limit`,
+`cursor`, `filter`, `sort`) and return `paged_metadata` with `items`. The count operation takes
+only `filter` and returns `{count}`. Filter and sort names default to the flattened path
+(`game.id` → `gameId`), the naming rule of the contract; `alias` overrides it (`name` for
+`displayName`).
+
+The input of a filter follows from the contract type of the path:
+
+| Type | Input | RSQL |
+|---|---|---|
+| string | text | `field=ilike="%text%"` (with `%`, `_`, `\` escaped) |
+| enum | choice chips (`enum.<Type>.<value>` labels) | `field=in=(A,B)` |
+| boolean | any / yes / no | `field==true` |
+| integer, number | from–to | `field=ge=1;field=le=4` |
+| date-time, date | from–to | `field=ge=<from>;field=lt=<day after to>` |
+| with `source:` | autocomplete | `field==<value>` |
+
+Filters are combined with `;`, the search text first. A filter or sort change goes back to the
+first page (debounced for typing); the total is only fetched again when the filter changed.
+With a cursor only `cursor` and `limit` are sent: the engine's cursor carries the criteria it was
+issued for, so they cannot disagree with it. The client always sends a sort: the initial one,
+or the first `@SearchSort`.
+
+**Which fields are allowed.** The contract lists them only in prose (the operation's
+`description`), so the annotations are the client's own declaration, checked against the item
+schema. When an operation has `x-stx-search: {filter: [...], sort: [...]}`, the compiler also
+checks every alias against it (`STX-U010`); without it the server rejects an unknown field
+with 400. Emitting `x-stx-search` from the `@Search*` annotations in stratastax-codegen is the
+follow-up that makes this a build error everywhere.
+
+**Layout.** `StxListScaffold` reads the breakpoint: with `layout: auto` the filters are a side
+panel from `lg`, a bar above the results from `collapseBelow` (default `md`), and a "Filters (n)"
+button with a full-screen sheet below it; `side` and `top` keep their shape down to
+`collapseBelow`. Results are a table (sortable headers) from `md` and cards below; active
+filters show as removable chips. Styling comes from `components.table`, `.chip` and `.panel`.
+
+**The service and the cache.** Pages never call a client: a generated `StxSearchService` per
+overview talks to the list and count endpoints, through `StxSearchCache`, one per
+`AppServices`. List endpoints send no `ETag` or `Cache-Control`, so caching is a client policy:
+`none`, `memory` (reuse until the ttl) or `staleWhileRevalidate` (show the old page at once,
+replace it when the fresh one arrives); stx.yaml `search.cache` sets the default, `@UiListPage`
+per page. The ttl is capped below the 24-hour lifetime of engine cursors, errors are not cached,
+and concurrent requests for one page share a call. Entries carry the contract tag of the
+endpoint: a successful generated form calls `invalidateTag` for the tag of its operation
+(`createMatch` → `matches`).
+
 Routing: `StxRouter.config(appRoutes, shell: …)` provides a `RouterConfig` for
 `WidgetsApp.router` (Navigator 2.0, page stack, deep links). Navigation is typed:
 `StxRouter.of<AppRoute>(context).go(const MatchCreateRoute())`.
@@ -596,6 +753,7 @@ Routing: `StxRouter.config(appRoutes, shell: …)` provides a `RouterConfig` for
 | Runtime cost | The claims are converted to a `Set<Scope>` once per token. A check is then a few set lookups. |
 | Wiring | With `security:` the compiler generates an `AppServices` with `Session`, `BearerAuthInterceptor(session)` on the clients of `auth: oidc` backends, and `SessionAccess` (implements `StxAccess` and `StxAuth`); `runStxApp` waits for `services.start()` (finish the callback or restore the session). `AppConfig.access` overrides the session, e.g. `StaticAccess` in tests and previews. Without `security:`, `access` remains required. |
 | Shell | `StxAppShell` shows the user name (`Msg.data`) and `stx.session.signOut`. |
+| Service accounts | A backend with `auth: serviceAccount` (§5 *Backends*) gets its own tokens with the client credentials grant, kept in memory, single-flight, renewed 30 s before expiry; a refused grant gives no token, an unreachable identity provider keeps the current one. **A client secret in an app is not a secret**: it can be extracted from the binary or the JavaScript. So a service account is only for data that is public anyway (the published translations): one Keycloak client per app, with read scopes only (`stx-i18n:bundle-read`). On the web, prefer `auth: token` with a token from a backend for frontend. |
 
 ---
 
@@ -613,16 +771,19 @@ Routing: `StxRouter.config(appRoutes, shell: …)` provides a `RouterConfig` for
 | Sync | `stx i18n sync` adds the keys that generated pages need, preserving formatting and comments: in the base locale with a suggestion (short contract `description`, otherwise the humanized name), in the other locales the base text plus a list of what needs translating |
 | Lint | `stx_no_string_in_ui`: a string literal in `Msg.data(…)` or `Text(…)` in app code |
 | Loading | `keys.g.dart`, `messages_<locale>.g.dart` (messages + `_Formats<Locale>`), `locales.g.dart` with deferred non-base locales |
+| From a backend | `i18n.remote`: the published texts of the i18n CMS are laid over the YAML texts at runtime, for existing keys only (see *Translations from a backend*) |
 
 ### Sources
 
 | Source | Contents | Owner |
 |---|---|---|
 | `stx_i18n` (defaults) | `stx.*`: validation, generic actions, no access, loading, empty state (en, nl) | framework |
-| `i18n/<locale>.yaml` | All screen texts and shared `common.*`. Source of truth of the app. | consumer |
+| `i18n/<locale>.yaml` | All screen texts and shared `common.*`. Source of truth of the app: its keys and placeholders. | consumer |
+| i18n backend (`i18n.remote`) | Published translations of existing keys, from the CMS | content editors |
 
-On a conflict the app wins over the framework: an app overrides a framework text by translating
-the same `stx.*` key.
+Precedence, highest first: the backend (fetched in this run) > the cached bundle > the app's YAML >
+the framework's YAML > the key name. An app overrides a framework text by translating the same
+`stx.*` key; the backend can override both.
 
 ### `stx i18n sync`
 
@@ -630,7 +791,8 @@ the same `stx.*` key.
 1. Missing keys are added to the base locale with a seed and `# TODO`. The seed is the
    OpenAPI `title` or the `description` of the linked property, and otherwise the humanized
    field name (`playedAt` becomes "Played at").
-2. Missing keys are added to the other locales with an empty value and `# untranslated`.
+2. Missing keys are added to the other locales with the base text, so the build passes, and are
+   listed so they can be translated.
 
 `stx build` fails on a missing base key. For other locales that depends on
 `missing: error|fallback`.
@@ -669,13 +831,16 @@ otherwise a build error follows.
 | `keys.g.dart` | `MsgCommon`, `MsgMatchCreateCommand`, … with `static const MsgKey` (usable in annotations), and typed factories for messages with parameters |
 | `messages_<locale>.g.dart` | Const `Map<String, String>` (key name → text, framework and app texts) plus a `switch` on the key name for messages with parameters, with plural via the generated CLDR rule |
 | `locales.g.dart` | `supportedLocales`, `loadMessages`. Non-base locales are `deferred`. |
+| `arguments.g.dart` | `messageArguments`: per key with placeholders their names and `ArgType`s, in the order of `MsgArgs.args`; `StxMessages.arguments` of every locale |
+| `app/translations.g.dart` | With `i18n.remote`: `RemoteTranslations`, the `TranslationSource` on `getBundle` of the i18n contract |
 
 ### Runtime
 
 - `Msg` is a sealed type with three forms:
   - `MsgKey('matchCreateCommand.gameId.label')`: the key name is the identity. A missing
     text shows the name
-  - `Msg.args(key, record)`: text with parameters
+  - `MsgArgs(key, [values])`: text with parameters, positional in the order of the
+    placeholders; built by the generated factories (`MsgMatchCreateCommand.playersCount(count: 2)`)
   - `Msg.data(String)`: for user data. The lint forbids a string literal here.
 - All `stx_ui` APIs accept `Msg`, never `String`. The lint `stx_no_string_in_ui` enforces this.
 - Plural rules and date/number patterns are generated by the compiler from a bundled CLDR subset,
@@ -683,12 +848,56 @@ otherwise a build error follows.
 - `StxLocaleScope` manages the current locale and persists the choice via `LocaleStore`.
 - Contract enums get an extension `ScoreTypeV1.numeric.msg`.
 
+### Translations from a backend
+
+```yaml
+backends:
+  i18n:
+    baseUrl: https://i18n.stratastax.dev
+    auth: serviceAccount
+    serviceAccount: { clientId: match-tracker-i18n, scopes: [stx-i18n:bundle-read] }
+i18n:
+  remote: { backend: i18n, application: match-tracker }   # spec: the i18n contract (default: docs.stratastax.dev)
+```
+
+`i18n.remote` adds the contract `stratastax.i18n.api-v1.yaml` as `stxI18nV1` for that backend
+(fetched and locked like any remote source, §3), and generates `RemoteTranslations` on its
+`getBundle`. `AppServices.translations` goes to `StxApp` and `StxLocaleScope`:
+
+1. A locale loads its compiled messages as before. When `AppConfig.translationCache` has a
+   bundle for it, that is laid over them at once. The first frame never waits for the network.
+2. In the background the bundle is fetched with `If-None-Match` (the ETag of the cached
+   bundle): `304` keeps what is shown, `404` (nothing published) keeps the YAML texts, a failure
+   is reported to `AppConfig.onTranslationIssue` and keeps the texts.
+3. A new bundle is cached and swapped in, unless the locale changed meanwhile.
+   `StxLocaleScope.refresh(context)` fetches again, e.g. when the app resumes.
+
+`OverlayMessages` lays a bundle over the compiled messages and validates every text when it is
+built:
+
+| Text from the backend | Result |
+|---|---|
+| A key the app does not have | Left out (`unknownKey`): the backend can only translate existing keys |
+| Invalid ICU | Left out (`syntax`) |
+| A placeholder the key does not have, or of another type (`StxMessages.arguments`, compatible as between locales) | Left out (`arguments`) |
+| A plain text for a key without placeholders | Used as is |
+| An ICU text for a key with placeholders | Parsed once, then interpreted per call by `formatIcu` (stx_i18n) with the locale's formats |
+
+The interpreter has the semantics of the compiled code (`#` and `number` through the locale
+formats, exact plural matches before the CLDR category, `other` as the fallback), so a text means
+the same whether it comes from YAML or from the CMS. Formats, plural rules and every other key
+stay compiled. A broken translation never breaks a screen; it only falls back to the YAML text.
+
 ---
 
 ## 10. Limitations
 
-- **Pages.** Only form pages are generated. There are no list/detail pages (no `@UiListPage`,
-  cursor pagination or search filter/sort), and route parameters are not supported (`STX-U006`).
+- **Pages.** Forms and overviews are generated; there are no detail pages yet, so a row of an
+  overview does not open anything, and route parameters are not supported (`STX-U006`).
+- **Overviews.** List operations with path parameters (`/games/{gameId}/expansions`) are not
+  supported; columns show single values (no lists); one sort key at a time; no free choice of
+  operator per filter. Without `x-stx-search` in the contract a wrong filter name is a 400 at
+  runtime, not a build error.
 - **Contract.** `anyOf`/`oneOf` with real alternatives (so no discriminator support), non-string
   enums, and request content other than JSON or a string schema are rejected (`STX-C002`).
 - **Auth.** The OIDC login is a web redirect flow. There are no mobile auth redirects, and the
@@ -709,7 +918,12 @@ and have no runtime meaning.
 | `@BuildTypeConverter(Type target)` | extension type / class | | Mapping domain type ↔ contract type |
 | `@BuildTypeGenerator(Type source)` | extension type / class | | Client-side generated values, such as ids for optimistic create |
 | `@UiForm({required Endpoint submit, UiNavigate onSuccess})` | class | | Generates controller, page, mapper and validation |
-| `@UiRoute(String path, {UiNav? nav})` | class | | Route entry, typed route class and nav item. Path params must exist as fields or as `@UiRouteParam`. |
+| `@UiRoute(String path, {UiNav? nav, bool home})` | class | | Route entry, typed route class and nav item. Path params must exist as fields or as `@UiRouteParam`. `home`: the page the app opens on (default `/`, else the first primary route). |
+| `@UiListPage({required Endpoint list, Endpoint? count, int? pageSize, UiSearchPanel panel, UiCache? cache, List<UiAction> actions})` | class | | Generates an overview: controller, filters, sorts, columns, page, `StxSearchService` (§7); `actions` open embedded pages (`UiAction(MatchCreateCommand)`) |
+| `@UiColumn({int? order, bool primary, int flex})` | field | | A column of an overview; `primary` is the card title on narrow screens |
+| `@SearchFilter({String alias, Type? source})` | field | | Filterable; the input follows from the type, or picks from a `@UiDataSource` |
+| `@SearchSort({String alias, SearchDirection direction, bool initial})` | field | | Sortable; `initial`: the sort the page opens with |
+| `@SearchText({String alias})` | field | | Part of the free-text search (strings) |
 | `@UiRequires(List<Scope> scopes)` | class | | Extra scope groups on top of the derived ones, using the generated `Scope` enum (e.g. for datasources that a custom field uses itself) |
 | `@UiFormOrder(int)` | field | | Order. A duplicate value is an error. |
 | `@UiFieldType(UiFieldType)` | field | | Overrides the derived field kind |
@@ -719,7 +933,7 @@ and have no runtime meaning.
 | `@UiFieldDataSource(Type)` | field | | Links to a `@UiDataSource` class |
 | `@UiFieldWidget([Type])` | class / field | | On a class: registers a custom field. On a field: uses that field, with type check. |
 | `@UiDataSource({Endpoint endpoint, String query, String value, String label})` | class | | Datasource on a contract operation. Strings are validated against the schema. |
-| `@ContractProperty(String name)` | field | | Overrides the name convention |
+| `@ContractProperty(String name)` | field | | Overrides the name convention; in an overview a path such as `game.displayName` |
 | `@UiIgnore()` | field | | Not in the form; the command gets the constructor default, which is sent if the contract has a property with that name. Without a property: UI-only data. |
 
 ---
@@ -734,6 +948,9 @@ and have no runtime meaning.
 | `STX-C004` | Two schemas, tags or params classes get the same Dart name |
 | `STX-C005` | Operation without `operationId` |
 | `STX-C006` | stx.yaml or a spec cannot be read |
+| `STX-R001` | A remote source cannot be fetched, or is not cached with `--offline` |
+| `STX-R002` | A fetched or cached remote source does not match its sha256 in `stx.lock` (hint: `stx sources update`) |
+| `STX-R003` | Unknown source alias in a reference, or an invalid `sources:` entry |
 | `STX-X001` | The compiler generated invalid Dart (a bug in the compiler; dart_style parses all output) |
 | `STX-S001` | Unknown or cyclic token reference, unknown token name in a component |
 | `STX-S002` | Required semantic slot missing and has no default |
@@ -743,10 +960,11 @@ and have no runtime meaning.
 | `STX-U003` | Type mismatch without `@BuildTypeConverter` |
 | `STX-U004` | `@UiFieldValidate` loosens the contract |
 | `STX-U005` | Generic type of `@UiFieldWidget` does not match the field |
-| `STX-U006` | Duplicate or conflicting route, or a path param without a source |
+| `STX-U006` | Duplicate or conflicting route, a path param without a source, or a `UiAction` to a class without `@UiRoute` |
 | `STX-U007` | `@UiDataSource`: `query`, `value` or `label` does not exist in the schema |
 | `STX-U008` | Duplicate `@UiFormOrder` |
 | `STX-U009` | Annotation cannot be evaluated (e.g. reference to a constant not yet generated) or used incorrectly |
+| `STX-U010` | `@UiListPage`: the list operation lacks `limit`/`cursor`/`filter`/`sort` or returns no page, the count operation is not `{count}` with only `filter`, a filter or search annotation does not fit the type, two initial sorts, a `pageSize` outside 1–100, or an alias outside `x-stx-search` |
 | `STX-I001` | Required key missing in the base locale |
 | `STX-I002` | Placeholders or types differ between locales |
 | `STX-I003` | Key missing in a non-base locale (with `missing: error`) |
@@ -875,3 +1093,48 @@ JWT signature; it only reads the claims to adapt the UI, the API verifies.
   `AppServices` is what is built from it.
 - **One client per backend.** A single client for the whole app is too limited; see §5
   *Backends*.
+
+### ADR-13: remote sources with a lock file, not copies or a package
+
+The contracts and the brand tokens are owned by other repositories and published on
+docs.stratastax.dev. Copying them into every app goes stale silently. A Dart package per contract
+would need a release for every contract change. Fetching on every build would make builds depend
+on the network, and different from day to day.
+
+So stx fetches them once into `.dart_tool` and pins their sha256 in `stx.lock`. It works like
+`pubspec.lock`: a build reads the same bytes until someone runs `stx sources update`, which shows
+what changed. The mechanism is generic (contracts and tokens use the same resolver), and the
+frontends only ever read a local file. `stx.local.yaml` points an alias at a checkout for
+unpublished changes. Only an `api-vN` file that changes backwards-compatibly is updated in place
+(the versioning rule of stratastax-contract); a breaking change is a new file, so a new reference.
+
+### ADR-14: translations from a backend overlay the compiled ones, interpreted at runtime
+
+Content editors want to change texts without a release; the app wants compiled, typed messages
+that are complete at every start. The YAML files therefore stay the source of keys, placeholders
+and the fallback, and the backend can only override texts of existing keys. Its texts cannot be
+compiled, so they are parsed and checked against the generated placeholder table once, and
+interpreted with the same semantics as the compiled code (the parser is shared through
+`stx_icu`). The overlay never blocks: compiled (or cached) texts first, the backend's when they
+arrive.
+
+The consumer reads published bundles with a service account, not with the user's session: the
+texts are the same for everyone, are needed before the login, and must not depend on the user's
+roles. Because a client secret in an app is not a secret, the service account only has the read
+scope of published bundles; the CMS uses the same contract with user auth for administrators.
+
+### ADR-15: overviews declared on the domain model, checked against `x-stx-search` when present
+
+The server already declares what is filterable and sortable, with `@SearchFilter` and
+`@SearchSort` on its entities, but the contract carries that only as prose. Parsing prose is
+fragile, and waiting for a machine-readable contract would block the client. Overviews are
+therefore declared with the same annotations on a client-side domain class, checked against the
+item schema (paths, types, operators per type), and the compiler checks them against an optional
+`x-stx-search` extension per operation, which stratastax-codegen can emit from the server
+annotations later. The UI can only narrow what the server allows, as with validation.
+
+Pages talk to a generated `StxSearchService`, not to a client, so paging, totals and caching are
+one place, and tests can replace the source. List endpoints have no HTTP caching, so the cache
+is a client policy with tags per contract resource; the generated forms drop the tags they make
+stale. Paging is a pager on the cursors (`nextCursor`, `prevCursor`) and the `/count` endpoints,
+not infinite scroll: positions and totals stay meaningful, and it works the same on every screen.

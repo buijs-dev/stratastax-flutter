@@ -1,5 +1,5 @@
 name: stx_i18n
-description: Compiled i18n runtime (message keys, locale scope, plural rules). Depends on flutter/widgets only.
+description: Compiled i18n runtime (message keys, locale scope, plural rules) with translations from a backend laid over it. Depends on flutter/widgets and stx_icu only.
 version: 0.0.1
 publish_to: none
 
@@ -13,6 +13,7 @@ dependencies:
   flutter:
     sdk: flutter
   meta: ^1.18.0
+  stx_icu: ^0.0.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

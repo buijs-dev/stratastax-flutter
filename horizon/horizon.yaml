@@ -1,0 +1,11 @@
+# Documentation of this repository on docs.stratastax.dev (see the README of stratastax-docs).
+# index.md is the component page, /technical/components/flutter/; other *.md here are pages below it.
+id: flutter
+title: Flutter
+summary: The stx compiler and the runtime packages for contract-driven Flutter apps
+group: frontend
+order: 30
+pages:
+- file: docs/ARCHITECTURE.md
+  slug: architecture
+  title: Architecture

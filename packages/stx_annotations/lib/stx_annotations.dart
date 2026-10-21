@@ -5,4 +5,5 @@ library;
 
 export 'src/domain.dart';
 export 'src/ui_field.dart';
+export 'src/ui_list.dart';
 export 'src/ui_page.dart';

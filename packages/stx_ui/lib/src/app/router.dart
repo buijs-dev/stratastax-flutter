@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:stx_core/stx_core.dart';
 import 'package:stx_i18n/stx_i18n.dart';
 import 'package:stx_style/stx_style.dart';
 
+import '../primitives/button.dart';
 import '../primitives/layout.dart';
+import 'access.dart';
 
 /// A navigation entry, generated from `@UiRoute(nav: ...)`.
 @immutable
@@ -25,6 +28,7 @@ final class StxRoutes<R extends Object> {
     required this.requires,
     required this.home,
     this.nav = const [],
+    this.parent,
   });
 
   /// Path segments → route; null for unknown paths. Generated as a `switch` over segment patterns.
@@ -34,6 +38,12 @@ final class StxRoutes<R extends Object> {
   final ScopeRequirement Function(R route) requires;
   final R home;
   final List<NavItem<R>> nav;
+
+  /// The page a route is embedded in (`/matches/new` in `/matches`); null: a top-level page.
+  final R? Function(R route)? parent;
+
+  /// [route] with the pages it is embedded in, outermost first.
+  List<R> ancestry(R route) => [if (parent?.call(route) case final p?) ...ancestry(p), route];
 }
 
 /// Navigation API for pages: `StxRouter.of<AppRoute>(context).go(const MatchCreateRoute())`.
@@ -46,11 +56,37 @@ abstract interface class StxNavigator<R extends Object> {
   /// Push [route] on top of the current page.
   void push(R route);
 
-  /// Pop the current page; at the root, go to the home route.
+  /// Pop the current page; at the root, go to the page it is embedded in, else the home route.
   void back();
 
   /// Whether [back] returns to a previous page.
   bool get canBack;
+
+  /// Whether [route] is the current page or a page it is embedded in (navigation highlights).
+  bool isActive(R route);
+}
+
+/// Opens [route] on top of the current page (e.g. the create form of an overview); hidden when
+/// the user lacks the scopes of that page.
+class StxRouteButton<R extends Object> extends StatelessWidget {
+  const StxRouteButton({
+    super.key,
+    required this.route,
+    required this.title,
+    required this.requires,
+    this.variant = ButtonVariant.primary,
+  });
+
+  final R route;
+  final Msg title;
+  final ScopeRequirement requires;
+  final ButtonVariant variant;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!StxAccessScope.allows(context, requires)) return const SizedBox.shrink();
+    return StxButton(title, variant: variant, onPressed: () => StxRouter.of<R>(context).push(route));
+  }
 }
 
 abstract final class StxRouter {
@@ -78,8 +114,11 @@ abstract final class StxRouter {
 }
 
 class _Parser extends RouteInformationParser<Object> {
+  /// Synchronous, so the first frame already shows the requested page: an async parse builds the
+  /// home page first (and starts its requests) before a deep link replaces it.
   @override
-  Future<Object> parseRouteInformation(RouteInformation routeInformation) async => routeInformation.uri;
+  Future<Object> parseRouteInformation(RouteInformation routeInformation) =>
+      SynchronousFuture<Object>(routeInformation.uri);
 
   @override
   RouteInformation? restoreRouteInformation(Object configuration) =>
@@ -120,13 +159,30 @@ class _Delegate<R extends Object> extends RouterDelegate<Object>
     notifyListeners();
   }
 
+  /// At the root (e.g. after a deep link to an embedded page): where [back] goes, if anywhere.
+  R? get _up => _stack.length > 1 || _stack.last is! R ? null : routes.parent?.call(_stack.last as R);
+
   @override
-  bool get canBack => _stack.length > 1;
+  bool get canBack => _stack.length > 1 || _up != null;
+
+  @override
+  bool isActive(R route) => routes.ancestry(current).contains(route);
 
   @override
   void back() {
-    _stack = _stack.length > 1 ? _stack.sublist(0, _stack.length - 1) : [routes.home];
+    _stack = _stack.length > 1 ? _stack.sublist(0, _stack.length - 1) : [_up ?? routes.home];
     notifyListeners();
+  }
+
+  /// The system back button: like [back] while there is somewhere to go; otherwise the platform
+  /// handles it (e.g. Android closes the app).
+  @override
+  Future<bool> popRoute() async {
+    if (_stack.length == 1 && _up != null) {
+      back();
+      return true;
+    }
+    return super.popRoute();
   }
 
   @override
@@ -140,6 +196,7 @@ class _Delegate<R extends Object> extends RouterDelegate<Object>
     final uri = configuration as Uri;
     final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
     final route = segments.isEmpty ? routes.home : routes.parse(segments);
+    // An embedded page opens alone (its parent would start requests nobody sees yet); back goes up.
     _stack = [route ?? _NotFound(uri)];
     notifyListeners();
   }

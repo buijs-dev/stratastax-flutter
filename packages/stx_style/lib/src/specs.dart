@@ -117,3 +117,83 @@ final class FocusSpec {
   final double width;
   final double offset;
 }
+
+/// Overviews: the header and rows of a table (and the cards that replace it on narrow screens).
+@immutable
+final class TableSpec {
+  const TableSpec({
+    this.headerBackground = ColorToken.surface,
+    this.headerForeground = ColorToken.muted,
+    this.background = ColorToken.transparent,
+    this.backgroundAlt = ColorToken.surface,
+    this.foreground = ColorToken.onBackground,
+    this.divider = ColorToken.border,
+    this.padX = SpaceToken.md,
+    this.padY = SpaceToken.sm,
+    this.header = TextToken.label,
+    this.text = TextToken.body,
+  });
+
+  final ColorToken headerBackground;
+  final ColorToken headerForeground;
+
+  /// Rows alternate between [background] and [backgroundAlt].
+  final ColorToken background;
+  final ColorToken backgroundAlt;
+  final ColorToken foreground;
+  final ColorToken divider;
+  final SpaceToken padX;
+  final SpaceToken padY;
+  final TextToken header;
+  final TextToken text;
+}
+
+/// Choice chips and active-filter chips.
+@immutable
+final class ChipSpec {
+  const ChipSpec({
+    this.background = ColorToken.surface,
+    this.foreground = ColorToken.onSurface,
+    this.selectedBackground = ColorToken.primary,
+    this.selectedForeground = ColorToken.onPrimary,
+    this.border = ColorToken.border,
+    this.padX = SpaceToken.sm,
+    this.padY = SpaceToken.xs,
+    this.radius = RadiusToken.full,
+    this.text = TextToken.caption,
+  });
+
+  final ColorToken background;
+  final ColorToken foreground;
+  final ColorToken selectedBackground;
+  final ColorToken selectedForeground;
+  final ColorToken border;
+  final SpaceToken padX;
+  final SpaceToken padY;
+  final RadiusToken radius;
+  final TextToken text;
+}
+
+/// The search and filter panel of an overview.
+@immutable
+final class PanelSpec {
+  const PanelSpec({
+    this.background = ColorToken.surface,
+    this.foreground = ColorToken.onSurface,
+    this.border = ColorToken.border,
+    this.padding = SpaceToken.md,
+    this.gap = SpaceToken.md,
+    this.radius = RadiusToken.md,
+    this.width = 280,
+  });
+
+  final ColorToken background;
+  final ColorToken foreground;
+  final ColorToken border;
+  final SpaceToken padding;
+  final SpaceToken gap;
+  final RadiusToken radius;
+
+  /// Width of the side panel, in logical pixels.
+  final double width;
+}

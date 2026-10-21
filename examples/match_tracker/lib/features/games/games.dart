@@ -15,7 +15,7 @@ final class GameSearchSource {}
 
 /// Creating a game: validation, scopes and the endpoint all come from `create_game` in the
 /// contract. Labels come from i18n/*.yaml (`gameCreateCommand.*`).
-@UiRoute('/games/new', nav: UiNav.secondary)
+@UiRoute('/games/new')
 @UiForm(submit: GamesApiV1.createGame)
 @DomainEntity()
 final class GameCreateCommand {

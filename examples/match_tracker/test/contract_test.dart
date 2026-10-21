@@ -80,7 +80,8 @@ void main() {
     });
 
     test('PATCH bodies distinguish unchanged, set and cleared', () {
-      final body = UpdateMatchV1(playedAt: Patch.value(DateTime.utc(2026, 10, 12)), playsetId: const Patch.value(null));
+      // playedAt is not nullable: set or left out. playsetId can also be cleared.
+      final body = UpdateMatchV1(playedAt: DateTime.utc(2026, 10, 12), playsetId: const Patch.value(null));
       expect(UpdateMatchV1.encode(body), {'playedAt': '2026-10-12T00:00:00.000Z', 'playsetId': null});
       expect(UpdateMatchV1.encode(const UpdateMatchV1()), isEmpty);
     });

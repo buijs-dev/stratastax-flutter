@@ -7,7 +7,9 @@ environment:
 workspace:
   - packages/stx_annotations
   - packages/stx_core
+  - packages/stx_icu
   - packages/stx_http
+  - packages/stx_search
   - packages/stx_security
   - packages/stx_style
   - packages/stx_i18n

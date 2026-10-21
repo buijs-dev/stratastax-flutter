@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:shelf/shelf.dart';
+import 'package:stub_server/gen/contract/i18n_v1/i18n_v1.g.dart' as i18n;
 import 'package:stub_server/gen/contract/platform_v1/platform_v1.g.dart';
 import 'package:stub_server/stub_server.dart';
 import 'package:test/test.dart';
@@ -104,6 +105,127 @@ void main() {
     expect(second.$2, first.$2);
     final (_, list, _) = await call('GET', '/api/v1/matches');
     expect(MatchListV1.decode(list).items, hasLength(1));
+  });
+
+  group('lists: RSQL filter, sort, cursors and counts (stratastax-search semantics)', () {
+    setUp(() => handler = stubHandler(store: StubStore(demo: true), oidc: oidc, log: (_) {}));
+
+    Future<GameListV1> games(Map<String, String> query) async {
+      final (status, json, _) = await call('GET', Uri(path: '/api/v1/games', queryParameters: query).toString());
+      expect(status, 200, reason: '$json');
+      return GameListV1.decode(json);
+    }
+
+    test('filter with ilike, in and ranges; sort with direction', () async {
+      final page = await games({
+        'filter': 'name=ilike="%an%";scoreType=in=(SCORE);minPlayers=ge=2',
+        'sort': 'name:DESC',
+      });
+      expect(page.items.map((g) => g.displayName), ['Hanabi', 'Catan']); // Wingspan has minPlayers 1
+      final or = await games({'filter': '(name=="Chess",name=="Root");maxPlayers=le=2'});
+      expect(or.items.map((g) => g.displayName), ['Chess']);
+    });
+
+    test('an escaped wildcard matches itself', () async {
+      final page = await games({'filter': r'name=ilike="%\\%%"'});
+      expect(page.items, isEmpty);
+    });
+
+    test('cursors page forwards and back with the criteria they were issued for', () async {
+      final first = await games({'limit': '12', 'sort': 'name:ASC'});
+      expect(first.items, hasLength(12));
+      expect(first.prevCursor, isNull);
+      final second = await games({'limit': '12', 'cursor': first.nextCursor!});
+      final third = await games({'limit': '12', 'cursor': second.nextCursor!});
+      expect(third.items, hasLength(6)); // 30 games
+      expect(third.nextCursor, isNull);
+      final back = await games({'limit': '12', 'cursor': third.prevCursor!});
+      expect(back.items.map((g) => g.id), second.items.map((g) => g.id));
+      final names = [...first.items, ...second.items, ...third.items].map((g) => g.displayName.toLowerCase()).toList();
+      expect(names, [...names]..sort());
+    });
+
+    test('count takes the same filter', () async {
+      final (status, json, _) = await call(
+        'GET',
+        '/api/v1/matches/count?filter=${Uri.encodeQueryComponent('editRequestsEnabled==true')}',
+      );
+      expect(status, 200);
+      expect(CountV1.decode(json).count, 23);
+    });
+
+    test('a field outside the whitelist is a 400, as in the engine', () async {
+      final (status, json, _) = await call('GET', '/api/v1/matches?filter=status==DRAFT');
+      expect(status, 400);
+      expect(((json! as Map)['errors'] as List).single, containsPair('code', 'INVALID_SEARCH'));
+      final (sortStatus, _, _) = await call('GET', '/api/v1/games?sort=description:ASC');
+      expect(sortStatus, 400);
+    });
+  });
+
+  group('translations', () {
+    Future<(int, Map<String, Object?>)> serviceAccountToken({String secret = 'stub-secret'}) async {
+      final response = await handler(
+        Request(
+          'POST',
+          Uri.parse('http://localhost/realms/stratastax/protocol/openid-connect/token'),
+          body: 'grant_type=client_credentials&client_id=match-tracker-i18n&client_secret=$secret',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        ),
+      );
+      return (response.statusCode, jsonDecode(await response.readAsString()) as Map<String, Object?>);
+    }
+
+    test('client credentials: a service account token with the bundle scope; a wrong secret is refused', () async {
+      final (status, json) = await serviceAccountToken();
+      expect(status, 200);
+      expect(json.containsKey('refresh_token'), isFalse);
+      final claims = oidc.verify('Bearer ${json['access_token']}')!;
+      expect(claims['sub'], 'service-account-match-tracker-i18n');
+      expect(jwtRoleClaims(claims), ['stx-i18n:bundle-read']);
+      expect((await serviceAccountToken(secret: 'guess')).$1, 401);
+    });
+
+    test('the published bundle with its release as ETag; If-None-Match with it is 304', () async {
+      final (_, token) = await serviceAccountToken();
+      final auth = {'Authorization': 'Bearer ${token['access_token']}'};
+      final (status, json, headers) = await call(
+        'GET',
+        '/api/v1/applications/match-tracker/bundles/nl',
+        headers: auth,
+        user: null,
+      );
+      expect(status, 200);
+      final bundle = i18n.TranslationBundleV1.decode(json);
+      expect(bundle.messages['app.title'], 'Partijen');
+      expect(headers['etag'], '"1"');
+
+      final (notModified, _, _) = await call(
+        'GET',
+        '/api/v1/applications/match-tracker/bundles/nl',
+        headers: {...auth, 'If-None-Match': '"1"'},
+        user: null,
+      );
+      expect(notModified, 304);
+      final (missing, _, _) = await call(
+        'GET',
+        '/api/v1/applications/match-tracker/bundles/en',
+        headers: auth,
+        user: null,
+      );
+      expect(missing, 404);
+    });
+
+    test('bundles need a token', () async {
+      final (status, _, _) = await call('GET', '/api/v1/applications/match-tracker/bundles/nl', user: null);
+      expect(status, 401);
+    });
+  });
+
+  test('routes with path parameters', () async {
+    final (status, json, _) = await call('GET', '/api/v1/games/0192f100-0000-7000-8000-00000000b000');
+    expect(status, 200);
+    expect(GameV1.decode(json).displayName, 'Catan');
   });
 
   test('unknown routes are contract problems', () async {

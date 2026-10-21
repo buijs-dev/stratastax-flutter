@@ -14,7 +14,8 @@ import 'icu.dart';
   return (className: 'Msg${Naming.pascal(segments.first)}', member: Naming.member(rest));
 }
 
-/// Renders `i18n/keys.g.dart`, `i18n/messages_<locale>.g.dart` and `i18n/locales.g.dart`.
+/// Renders `i18n/keys.g.dart`, `i18n/arguments.g.dart`, `i18n/messages_<locale>.g.dart` and
+/// `i18n/locales.g.dart`.
 List<GeneratedFile> renderI18n(I18nIR ir, {required bool deferred, required Diagnostics diagnostics}) {
   // keys.g.dart: app keys only; framework keys are StxKeys in stx_i18n.
   final classes = <String, List<String>>{};
@@ -54,6 +55,25 @@ List<GeneratedFile> renderI18n(I18nIR ir, {required bool deferred, required Diag
 
   final files = [GeneratedFile('i18n/keys.g.dart', keys.toString())];
 
+  // arguments.g.dart: the placeholders per key, shared by every locale, so a translation from a
+  // backend (OverlayMessages) can use them by name.
+  final arguments = StringBuffer()
+    ..writeln(generatedHeader)
+    ..writeln('// Source: the base locale (${ir.base}) of the app translations and the stx_i18n framework texts.')
+    ..writeln()
+    ..writeln("import 'package:stx_i18n/stx_i18n.dart';")
+    ..writeln()
+    ..writeln('/// The placeholders of every message that has them, in the order of `MsgArgs.args`.')
+    ..writeln('const messageArguments = <String, List<(String, ArgType)>>{');
+  for (final m in ir.messages.where((m) => m.placeholders.isNotEmpty)) {
+    final list = [
+      for (final name in m.placeholders) '(${Naming.stringLiteral(name)}, ArgType.${m.arguments[name]!.name})',
+    ];
+    arguments.writeln('  ${Naming.stringLiteral(m.key)}: [${list.join(', ')}],');
+  }
+  arguments.writeln('};');
+  files.add(GeneratedFile('i18n/arguments.g.dart', arguments.toString()));
+
   // messages_<locale>.g.dart
   for (final locale in ir.locales) {
     final className = 'Messages${Naming.pascal(locale)}';
@@ -67,6 +87,8 @@ List<GeneratedFile> renderI18n(I18nIR ir, {required bool deferred, required Diag
       ..writeln()
       ..writeln("import 'package:flutter/widgets.dart';")
       ..writeln("import 'package:stx_i18n/stx_i18n.dart';")
+      ..writeln()
+      ..writeln("import 'arguments.g.dart';")
       ..writeln()
       ..writeln('final class $className extends StxMessages {')
       ..writeln('  const $className() : super(const ${_locale(locale)}, _plain);')
@@ -82,6 +104,9 @@ List<GeneratedFile> renderI18n(I18nIR ir, {required bool deferred, required Diag
       ..writeln()
       ..writeln('  @override')
       ..writeln('  StxLocaleFormats get formats => const $formatsClass();')
+      ..writeln()
+      ..writeln('  @override')
+      ..writeln('  Map<String, List<(String, ArgType)>> get arguments => messageArguments;')
       ..writeln()
       ..writeln('  @override')
       ..writeln('  String format(String key, List<Object?> args) {')
